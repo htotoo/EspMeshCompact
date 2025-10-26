@@ -109,6 +109,9 @@ class MCC_NODEINFO {
             pos += 4;
             longitude_i = *((uint32_t*)&data[pos]);
             pos += 4;
+            has_location = true;
+        } else {
+            has_location = false;
         }
         if (flags & (uint8_t)MCC_NODEINFO_FLAGS::HAS_FEATURE_1) {
             // skip feature 1 data for now
@@ -131,6 +134,13 @@ class MCC_NODEINFO {
     uint32_t latitude_i;   // optional
     uint32_t longitude_i;  // optional
     std::string name;
+    bool has_location = false;
+};
+
+class MCC_ChannelEntry {
+   public:
+    std::string name;
+    uint8_t secret[32];
 };
 
 #endif  // MeshCoreCompactStructs_h
