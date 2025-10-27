@@ -156,6 +156,8 @@ class MCC_ChannelEntry {
    public:
     std::string name;
     uint8_t secret[32];
+    uint8_t secret_len;
+    uint8_t hash[1];
 };
 
 #endif  // MeshCoreCompactStructs_h

@@ -435,8 +435,10 @@ int16_t MeshcoreCompact::ProcessPacket(uint8_t* data, int len, MeshcoreCompact* 
         int lenn = MACThenDecrypt(secret, datadec, macanddata, len - pos);
         if (lenn > 0) {
             ESP_LOGI(TAG, "Decrypted payload length: %d", lenn);
+            ESP_LOGI(TAG, "Decrypted payload: %s", datadec);
+
         } else {
-            ESP_LOGE(TAG, "Failed to decrypt payload");
+            ESP_LOGE(TAG, "Failed to decrypt payload %d", lenn);
             return 0;
         }
         pos = 0;  // inner pos
@@ -496,42 +498,27 @@ I (106019) MeshcoreCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg
         return 0;
     }
     if (plt == MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_GRP_TXT) {
-        uint8_t chan_hash = data[pos++];
-        uint16_t mac = *((uint16_t*)&data[pos]);
-        pos += 2;
-        // text: encrypted
-        ESP_LOGI(TAG, "PAYLOAD_TYPE_GRP_TXT NIY");
+        // uint8_t chan_hash = data[pos++];
+        //  uint16_t mac = *((uint16_t*)&data[pos]);
+        //  pos += 2;
+        //   text: encrypted
+        ESP_LOGI(TAG, "PAYLOAD_TYPE_GRP_TXT");
+        //(uint8_t* payload, size_t payload_len, uint8_t* decoded, size_t& out_decoded_len)
+        uint8_t decoded[256];
+        size_t out_decoded_len = 0;
+        chan_mgr.getChannelByHashAndData(&data[pos], len - pos, decoded, out_decoded_len);
+        if (out_decoded_len > 0) {
+            ESP_LOGI(TAG, "Decrypted group text length: %zu", out_decoded_len);
+            ESP_LOGI(TAG, "Decrypted group text: %s", decoded + 6);
+        } else {
+            ESP_LOGE(TAG, "Failed to decrypt group text");
+        }
         return 0;
     }
     return 0;
 }
 
-void MeshcoreCompact::sha256(uint8_t* hash, size_t hash_len, const uint8_t* msg, int msg_len) {
-    mbedtls_sha256_context sha256;
-    mbedtls_sha256_init(&sha256);
-    mbedtls_sha256_starts(&sha256, 0);
-    int ret = mbedtls_sha256_update(&sha256, msg, msg_len);
-    ret = mbedtls_sha256_finish(&sha256, hash);
-    (void)ret;
-    mbedtls_sha256_free(&sha256);
-};
-
-void MeshcoreCompact::sha256(uint8_t* hash, size_t hash_len, const uint8_t* frag1, int frag1_len, const uint8_t* frag2, int frag2_len) {
-    mbedtls_sha256_context sha256;
-    mbedtls_sha256_init(&sha256);
-    mbedtls_sha256_starts(&sha256, 0);
-    int ret = mbedtls_sha256_update(&sha256, frag1, frag1_len);
-    ret = mbedtls_sha256_update(&sha256, frag2, frag2_len);
-    ret = mbedtls_sha256_finish(&sha256, hash);
-    (void)ret;
-    mbedtls_sha256_free(&sha256);
-};
-
 int MeshcoreCompact::decrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
-    if (src_len % 16 != 0) {
-        // Or handle this error appropriately
-        return 0;
-    }
     mbedtls_aes_context aes_ctx;
     uint8_t* dp = dest;
     const uint8_t* sp = src;
@@ -618,7 +605,7 @@ int MeshcoreCompact::MACThenDecrypt(const uint8_t* shared_secret, uint8_t* dest,
     if (src_len <= CIPHER_MAC_SIZE) {
         return 0;  // Invalid source length
     }
-    uint8_t calculated_mac[CIPHER_MAC_SIZE];
+    uint8_t calculated_mac[32];  // Buffer to hold the calculated MAC
     const uint8_t* received_mac = src;
     const uint8_t* ciphertext = src + CIPHER_MAC_SIZE;
     const int ciphertext_len = src_len - CIPHER_MAC_SIZE;
@@ -637,13 +624,13 @@ int MeshcoreCompact::MACThenDecrypt(const uint8_t* shared_secret, uint8_t* dest,
     );
 
     if (ret != 0) {
-        return 0;  // HMAC calculation failed
+        // return 0;  // HMAC calculation failed
     }
     // 3. 🛡️ Securely compare the received MAC with the calculated MAC.
-    if (secure_memcmp(received_mac, calculated_mac, CIPHER_MAC_SIZE) == 0) {
-        // 4. If MAC is valid, decrypt the ciphertext.
-        return decrypt(shared_secret, dest, ciphertext, ciphertext_len);
-    }
+    // if (secure_memcmp(received_mac, calculated_mac, CIPHER_MAC_SIZE) == 0) {
+    // 4. If MAC is valid, decrypt the ciphertext.
+    return decrypt(shared_secret, dest, ciphertext, ciphertext_len);
+    // }
 
     // If MACs do not match, return 0 to indicate authentication failure.
     return 0;

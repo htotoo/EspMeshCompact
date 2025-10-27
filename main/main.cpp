@@ -31,6 +31,7 @@ void onRaw(const uint8_t* data, size_t len) {
 extern "C" void app_main(void) {
     mesh.RadioInit(RadioType::SX1262, radio_pins, lora_config);
     mesh.setOnRaw(onRaw);
+    mesh.chan_mgr.addChannel("TTest", "38c42a7bf8c329d8e7759ac8b1f83d96");
     printf("Hello, world!\n");
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(1000));

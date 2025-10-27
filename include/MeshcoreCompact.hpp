@@ -17,7 +17,7 @@
 #include <deque>
 #include "MeshcoreCompactStructs.hpp"
 #include "MeshcoreCompactNodeInfoDB.hpp"
-#include "mbedtls/sha256.h"
+#include "MeshcoreCompatChanMgr.hpp"
 #include "mbedtls/constant_time.h"
 
 #define MAX_PACKET_PAYLOAD 184
@@ -53,7 +53,14 @@ class MeshcoreCompact {
     bool setRadioCodingRate(uint8_t cr);
     bool setRadioPower(int8_t power);
 
-    NodeInfoCoreDB nodeinfo_db;
+    NodeInfoCoreDB nodeinfo_db{};
+    MeshcoreCompatChanMgr chan_mgr{};
+
+    static int decrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len);
+    static int encrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len);
+    static int encryptThenMAC(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len);
+    static int MACThenDecrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len);
+    static int secure_memcmp(const void* a, const void* b, size_t size);
 
    private:
     RadioType radio_type;
@@ -66,13 +73,6 @@ class MeshcoreCompact {
 
     // decoding
     int16_t ProcessPacket(uint8_t* data, int len, MeshcoreCompact* mshcomp);  // Process the packet, decode it, and call the appropriate handler
-    void sha256(uint8_t* hash, size_t hash_len, const uint8_t* msg, int msg_len);
-    void sha256(uint8_t* hash, size_t hash_len, const uint8_t* frag1, int frag1_len, const uint8_t* frag2, int frag2_len);
-    int decrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len);
-    int encrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len);
-    int encryptThenMAC(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len);
-    int MACThenDecrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len);
-    int secure_memcmp(const void* a, const void* b, size_t size);
 
     static void task_listen(void* pvParameters);  // Task for listening to the radio and processing incoming packets
     static void task_send(void* pvParameters);    // Task for sending packets from the out_queue
