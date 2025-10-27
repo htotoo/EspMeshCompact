@@ -617,20 +617,20 @@ int MeshcoreCompact::MACThenDecrypt(const uint8_t* shared_secret, uint8_t* dest,
     int ret = mbedtls_md_hmac(
         md_info,         // Use SHA256
         shared_secret,   // The HMAC key
-        PUB_KEY_SIZE,    // Key length
+        16,              // Key length //todo maybe different for other things. needs to check!!
         ciphertext,      // The data to authenticate
         ciphertext_len,  // Length of the data
         calculated_mac   // Output buffer for the calculated MAC
     );
 
     if (ret != 0) {
-        // return 0;  // HMAC calculation failed
+        return 0;  // HMAC calculation failed
     }
     // 3. 🛡️ Securely compare the received MAC with the calculated MAC.
-    // if (secure_memcmp(received_mac, calculated_mac, CIPHER_MAC_SIZE) == 0) {
-    // 4. If MAC is valid, decrypt the ciphertext.
-    return decrypt(shared_secret, dest, ciphertext, ciphertext_len);
-    // }
+    if (secure_memcmp(received_mac, calculated_mac, CIPHER_MAC_SIZE) == 0) {
+        // 4. If MAC is valid, decrypt the ciphertext.
+        return decrypt(shared_secret, dest, ciphertext, ciphertext_len);
+    }
 
     // If MACs do not match, return 0 to indicate authentication failure.
     return 0;
