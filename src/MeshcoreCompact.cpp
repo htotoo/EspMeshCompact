@@ -498,18 +498,19 @@ I (106019) MeshcoreCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg
         return 0;
     }
     if (plt == MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_GRP_TXT) {
-        // uint8_t chan_hash = data[pos++];
-        //  uint16_t mac = *((uint16_t*)&data[pos]);
-        //  pos += 2;
-        //   text: encrypted
         ESP_LOGI(TAG, "PAYLOAD_TYPE_GRP_TXT");
-        //(uint8_t* payload, size_t payload_len, uint8_t* decoded, size_t& out_decoded_len)
-        uint8_t decoded[256];
+        uint8_t decoded[MAX_PACKET_PAYLOAD];
         size_t out_decoded_len = 0;
-        chan_mgr.getChannelByHashAndData(&data[pos], len - pos, decoded, out_decoded_len);
-        if (out_decoded_len > 0) {
+        auto chan = chan_mgr.getChannelByHashAndData(&data[pos], len - pos, decoded, out_decoded_len);
+        if (out_decoded_len > 0 && chan) {
+            // todo extract other data too
             ESP_LOGI(TAG, "Decrypted group text length: %zu", out_decoded_len);
             ESP_LOGI(TAG, "Decrypted group text: %s", decoded + 6);
+            if (onGroupMsg) {
+                size_t msglen = strnlen((const char*)(decoded + 6), out_decoded_len - 6);
+                std::string grpmsg = std::string((const char*)(decoded + 6), msglen);
+                onGroupMsg(*chan, grpmsg);
+            }
         } else {
             ESP_LOGE(TAG, "Failed to decrypt group text");
         }

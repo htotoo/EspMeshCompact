@@ -37,9 +37,11 @@ class MeshcoreCompact {
 
     using OnRaw = void (*)(const uint8_t* data, size_t len);
     using OnNodeInfo = void (*)(const MCC_Nodeinfo& info);
+    using OnGroupMsg = void (*)(const MCC_ChannelEntry& channel, const std::string& msg);  // todo extract other data
 
     void setOnRaw(OnRaw cb) { onRaw = cb; }
     void setOnNodeInfo(OnNodeInfo cb) { onNodeInfo = cb; }
+    void setOnGroupMsg(OnGroupMsg cb) { onGroupMsg = cb; }
 
     void getLastSignalData(float& rssi_out, float& snr_out) {
         rssi_out = rssi;
@@ -87,4 +89,5 @@ class MeshcoreCompact {
 
     OnRaw onRaw = nullptr;
     OnNodeInfo onNodeInfo = nullptr;
+    OnGroupMsg onGroupMsg = nullptr;
 };
