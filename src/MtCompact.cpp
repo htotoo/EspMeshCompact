@@ -318,9 +318,12 @@ void MtCompact::task_send(void* pvParameters) {
             if (!aesenc) {
                 // private message, encrypt with that method if pubkey is availeable //todo
                 mshcomp->encryptCurve25519(entry.header.dstnode, entry.header.srcnode, dstpub, entry.header.packet_id, payload_len, payload, encrypted_payload);
+                payload_len += 12;  // Curve25519 adds 16 bytes overhead
+                ESP_LOGI("SEND", "Curve25519 encrypt to node 0x%08" PRIx32, entry.header.dstnode);
                 continue;
             } else {
                 if (mshcomp->aes_decrypt_meshtastic_payload(entry.key, entry.key_len * 8, entry.header.packet_id, entry.header.srcnode, payload, encrypted_payload, payload_len)) {
+                    ESP_LOGI("SEND", "AES encrypt to node 0x%08" PRIx32, entry.header.dstnode);
                 } else {
                     ESP_LOGE(TAG, "Failed to encrypt payload");
                     continue;
@@ -437,14 +440,15 @@ void MtCompact::intOnMessage(MCT_Header& header, MCT_TextMessage& message) {
 void MtCompact::intOnPositionMessage(MCT_Header& header, meshtastic_Position& position_msg, bool want_reply) {
     MCT_Position position = {.latitude_i = position_msg.latitude_i, .longitude_i = position_msg.longitude_i, .altitude = position_msg.altitude, .ground_speed = position_msg.ground_speed, .sats_in_view = position_msg.sats_in_view, .location_source = (uint8_t)position_msg.location_source, .has_latitude_i = position_msg.has_latitude_i, .has_longitude_i = position_msg.has_longitude_i, .has_altitude = position_msg.has_altitude, .has_ground_speed = position_msg.has_ground_speed};
     if (position.has_latitude_i && position.has_longitude_i) nodeinfo_db.setPosition(header.srcnode, position);  // not saved the request, since that is mostly empty
-    bool needReply = (want_reply == true && !is_auto_full_node && is_send_enabled);
+    bool isForMe = (header.dstnode == my_nodeinfo.node_id || header.dstnode == 0xFFFFFFFF);
+    bool needReply = (want_reply == true && !is_auto_full_node && is_send_enabled && isForMe);
     if (onPositionMessage) {
         onPositionMessage(header, position, needReply);
     };
     if (onNativePositionMessage) {
         onNativePositionMessage(header, position_msg, needReply);
     }
-    if (want_reply && is_auto_full_node && is_send_enabled) {
+    if (want_reply && is_auto_full_node && is_send_enabled && isForMe) {
         ESP_LOGI(TAG, "AUTO Sending my pos info to node 0x%08" PRIx32, header.srcnode);
         sendMyPosition(header.srcnode);
     }
@@ -463,15 +467,15 @@ void MtCompact::intOnNodeInfo(MCT_Header& header, meshtastic_User& user_msg, boo
     node_info.hw_model = user_msg.hw_model;
     node_info.last_updated = hal->millis();
     bool newnode = nodeinfo_db.addOrUpdate(header.srcnode, node_info);  // if want ack, then exchange happened, but we got info too
-
-    bool needReply = (want_reply == true && !is_auto_full_node) && is_send_enabled;
+    bool wasForMe = (header.dstnode == my_nodeinfo.node_id || header.dstnode == 0xFFFFFFFF);
+    bool needReply = (want_reply == true && !is_auto_full_node) && is_send_enabled && wasForMe;
     if (onNodeInfo) {
         onNodeInfo(header, node_info, needReply, newnode);
     };
     if (onNativeNodeInfo) {
         onNativeNodeInfo(header, user_msg, needReply, newnode);
     }
-    if (want_reply && is_auto_full_node && is_send_enabled) {
+    if (want_reply && is_auto_full_node && is_send_enabled && wasForMe) {
         ESP_LOGI(TAG, "AUTO Sending my node info to node 0x%08" PRIx32, header.srcnode);
         sendMyNodeInfo(header.srcnode);
     }
@@ -642,13 +646,16 @@ int16_t MtCompact::processPacket(uint8_t* data, int len, MtCompact* mshcomp) {
         header.via_mqtt = !!(packet_flags & PACKET_FLAGS_VIA_MQTT_MASK);
         header.hop_start = (packet_flags & PACKET_FLAGS_HOP_START_MASK) >> PACKET_FLAGS_HOP_START_SHIFT;
 
+        ESP_LOGI(TAG, "Dst: 0x%08" PRIx32 " Src: 0x%08" PRIx32 " PacketId: 0x%08" PRIx32, header.dstnode, header.srcnode, header.packet_id);
+        ESP_LOGI(TAG, "Chan: %u", header.chan_hash);
+
         meshtastic_Data decodedtmp;
         int16_t ret = try_decode_root_packet(&data[16], len - 16, &meshtastic_Data_msg, &decodedtmp, sizeof(decodedtmp), header);
         if (ret >= 0) {
             // extract the want_response from bitfield
             decodedtmp.want_response |= decodedtmp.bitfield & BITFIELD_WANT_RESPONSE_MASK;
-            ESP_LOGI(TAG, "PortNum: %d  PacketId: %lu  Src: %lu", decodedtmp.portnum, header.packet_id, header.srcnode);
-            ESP_LOGI(TAG, "Want ack: %d", header.want_ack ? 1 : 0);
+            ESP_LOGI(TAG, "PortNum: %d  PacketId: %lu  Src: 0x%08" PRIx32, decodedtmp.portnum, header.packet_id, header.srcnode);
+            ESP_LOGI(TAG, "Want ack: %d Chan: %u", header.want_ack ? 1 : 0, header.chan_hash);
             ESP_LOGI(TAG, "Want Response: %d", decodedtmp.want_response);
             ESP_LOGI(TAG, "Request ID: %" PRIu32, decodedtmp.request_id);
             ESP_LOGI(TAG, "Reply ID: %" PRIu32, decodedtmp.reply_id);
@@ -987,7 +994,7 @@ void MtCompact::sendTraceroute(uint32_t dest_node_id, uint8_t chan, uint32_t sen
     entry.header.want_ack = 1;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = chan;
+    entry.header.chan_hash = chan == 255 ? pri_chan_hash : chan;
     entry.header.via_mqtt = 0;
     entry.encType = 1;
     meshtastic_RouteDiscovery route_discovery_msg = meshtastic_RouteDiscovery_init_default;
@@ -1012,9 +1019,9 @@ void MtCompact::sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode, bool exch
     entry.header.want_ack = 0;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = 8;  // Use default channel hash
-    entry.header.via_mqtt = 0;   // Not used in this case
-    entry.encType = 1;           // AES encryption
+    entry.header.chan_hash = pri_chan_hash;  // Use default channel hash
+    entry.header.via_mqtt = 0;               // Not used in this case
+    entry.encType = 1;                       // AES encryption
     meshtastic_User user_msg = {};
     memcpy(user_msg.id, nodeinfo.id, sizeof(user_msg.id));
     memcpy(user_msg.short_name, nodeinfo.short_name, sizeof(user_msg.short_name));
@@ -1022,6 +1029,7 @@ void MtCompact::sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode, bool exch
     memcpy(user_msg.macaddr, nodeinfo.macaddr, sizeof(user_msg.macaddr));
     memcpy(user_msg.public_key.bytes, nodeinfo.public_key, sizeof(user_msg.public_key.bytes));
     user_msg.public_key.size = nodeinfo.public_key_size;
+    user_msg.is_licensed = false;
     entry.data.bitfield = 0;
     if (ok_to_mqtt) entry.data.bitfield |= 1 << BITFIELD_OK_TO_MQTT_SHIFT;  // Set the MQTT upload bit
     entry.data.has_bitfield = true;
@@ -1057,7 +1065,7 @@ void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint8
     entry.header.want_ack = 1;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = chan;
+    entry.header.chan_hash = chan == 255 ? pri_chan_hash : chan;
     entry.header.via_mqtt = 0;
     entry.encType = 0;
     entry.data.payload.size = text.size();
@@ -1082,7 +1090,7 @@ void MtCompact::sendRequestPositionInfo(uint32_t dest_node_id, uint8_t chan, uin
     entry.header.want_ack = 0;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = chan;
+    entry.header.chan_hash = chan == 255 ? pri_chan_hash : chan;
     entry.header.via_mqtt = 0;
     entry.encType = 1;
     entry.data.portnum = meshtastic_PortNum_POSITION_APP;
@@ -1107,7 +1115,7 @@ void MtCompact::sendPositionMessage(MCT_Position& position, uint32_t dstnode, ui
     entry.header.want_ack = 0;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = chan;
+    entry.header.chan_hash = chan == 255 ? pri_chan_hash : chan;
     entry.header.via_mqtt = 0;
     entry.encType = 1;
     entry.data.portnum = meshtastic_PortNum_POSITION_APP;
@@ -1145,7 +1153,7 @@ void MtCompact::sendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode, ui
     entry.header.want_ack = 0;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = chan;
+    entry.header.chan_hash = chan == 255 ? pri_chan_hash : chan;
     entry.header.via_mqtt = 0;
     entry.encType = 1;  // AES encryption
     entry.data.portnum = meshtastic_PortNum_WAYPOINT_APP;
@@ -1178,7 +1186,7 @@ void MtCompact::sendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t ds
     entry.header.want_ack = 0;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = chan;
+    entry.header.chan_hash = chan == 255 ? pri_chan_hash : chan;
     entry.header.via_mqtt = 0;
     entry.encType = 1;
     entry.data.portnum = meshtastic_PortNum_TELEMETRY_APP;
@@ -1214,7 +1222,7 @@ void MtCompact::sendTelemetryEnvironment(MCT_Telemetry_Environment& telemetry, u
     entry.header.want_ack = 0;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = chan;
+    entry.header.chan_hash = chan == 255 ? pri_chan_hash : chan;
     entry.header.via_mqtt = 0;
     entry.encType = 1;
     entry.data.portnum = meshtastic_PortNum_TELEMETRY_APP;
@@ -1271,10 +1279,9 @@ void MtCompact::initNonce(uint32_t fromNode, uint64_t packetId, uint32_t extraNo
 
 bool MtCompact::encryptCurve25519(uint32_t toNode, uint32_t fromNode, uint8_t* remotePublic, uint64_t packetNum, size_t numBytes, const uint8_t* bytes, uint8_t* bytesOut) {
     uint8_t* auth;
-    long extraNonceTmp = random();
+    long extraNonceTmp = esp_random();
     auth = bytesOut + numBytes;
-    memcpy((uint8_t*)(auth + 8), &extraNonceTmp,
-           sizeof(uint32_t));  // do not use dereference on potential non aligned pointers : *extraNonce = extraNonceTmp;
+    memcpy((uint8_t*)(auth + 8), &extraNonceTmp, sizeof(uint32_t));  // do not use dereference on potential non aligned pointers : *extraNonce = extraNonceTmp;
     if (!setDHPublicKey(remotePublic)) {
         return false;
     }
@@ -1289,7 +1296,7 @@ bool MtCompact::encryptCurve25519(uint32_t toNode, uint32_t fromNode, uint8_t* r
 bool MtCompact::setDHPublicKey(uint8_t* pubKey) {
     uint8_t local_priv[32];
     memcpy(shared_key, pubKey, 32);
-    memcpy(local_priv, my_nodeinfo.private_key, my_nodeinfo.private_key_size);
+    memcpy(local_priv, my_nodeinfo.private_key, my_nodeinfo.public_key_size);
     // Calculate the shared secret with the specified node's public key and our private key
     // This includes an internal weak key check, which among other things looks for an all 0 public key and shared key.
     if (!Curve25519::dh2(shared_key, local_priv)) {

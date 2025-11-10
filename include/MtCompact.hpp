@@ -124,16 +124,18 @@ class MtCompact {
         sendNodeInfo(my_nodeinfo, dstnode, exchange);
     }
     void sendTextMessage(const std::string& text, uint32_t dstnode = 0xffffffff, uint8_t chan = 0, MCT_MESSAGE_TYPE type = MCT_MESSAGE_TYPE_TEXT, uint32_t sender_node_id = 0);
-    void sendPositionMessage(MCT_Position& position, uint32_t dstnode = 0xffffffff, uint8_t chan = 8, uint32_t sender_node_id = 0);
-    void sendMyPosition(uint32_t dstnode = 0xffffffff, uint8_t chan = 8) {
+    void sendPositionMessage(MCT_Position& position, uint32_t dstnode = 0xffffffff, uint8_t chan = 0, uint32_t sender_node_id = 0);
+    void sendMyPosition(uint32_t dstnode = 0xffffffff, uint8_t chan = 0) {
         sendPositionMessage(my_position, dstnode, chan);
     }
-    void sendRequestPositionInfo(uint32_t dest_node_id, uint8_t chan = 8, uint32_t sender_node_id = 0);
-    void sendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode = 0xffffffff, uint8_t chan = 8, uint32_t sender_node_id = 0);
-    void sendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t dstnode = 0xffffffff, uint8_t chan = 8, uint32_t sender_node_id = 0);
-    void sendTelemetryEnvironment(MCT_Telemetry_Environment& telemetry, uint32_t dstnode = 0xffffffff, uint8_t chan = 8, uint32_t sender_node_id = 0);
+    void sendRequestPositionInfo(uint32_t dest_node_id, uint8_t chan = 0, uint32_t sender_node_id = 0);
+    void sendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode = 0xffffffff, uint8_t chan = 0, uint32_t sender_node_id = 0);
+    void sendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t dstnode = 0xffffffff, uint8_t chan = 0, uint32_t sender_node_id = 0);
+    void sendTelemetryEnvironment(MCT_Telemetry_Environment& telemetry, uint32_t dstnode = 0xffffffff, uint8_t chan = 0, uint32_t sender_node_id = 0);
     void sendTracerouteReply(MCT_Header& header, MCT_RouteDiscovery& route_discovery);
-    void sendTraceroute(uint32_t dest_node_id, uint8_t chan = 8, uint32_t sender_node_id = 0);
+    void sendTraceroute(uint32_t dest_node_id, uint8_t chan = 0, uint32_t sender_node_id = 0);
+
+    void setPrimaryChanHash(uint8_t chan_hash) { pri_chan_hash = chan_hash; }
 
     // Radio settings on the fly
     bool setRadioFrequency(float freq);
@@ -208,6 +210,8 @@ class MtCompact {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};  // default channel key
 
+    uint8_t pri_chan_hash = 8;  // for longfast
+
     uint8_t shared_key[32] = {0};
     uint8_t nonce[16] = {0};
     AESSmall256* aes = NULL;
@@ -246,9 +250,12 @@ class MtCompactHelpers {
     static void TelemetryEnvironmentBuilder(MCT_Telemetry_Environment& telemetry, float temperature = -10000.0f, float humidity = -1.0f, float pressure = -1.0f, float lux = -1.0f);
     static void WaypointBuilder(MCT_Waypoint& waypoint, uint32_t id, float latitude, float longitude, std::string name, std::string description, uint32_t expire = 1, uint32_t icon = 0);
     static void GeneratePrivateKey(uint8_t* private_key, uint8_t& key_size, uint8_t* public_key);
+    static void GeneratePrivateKey(MCT_MyNodeInfo& my_nodeinfo) {
+        GeneratePrivateKey(my_nodeinfo.private_key, my_nodeinfo.public_key_size, my_nodeinfo.public_key);
+    }
     static void RegenerateOrGeneratePrivateKey(uint8_t* private_key, uint8_t& key_size, uint8_t* public_key);
     static void RegenerateOrGeneratePrivateKey(MCT_MyNodeInfo& my_nodeinfo) {
-        RegenerateOrGeneratePrivateKey(my_nodeinfo.private_key, my_nodeinfo.private_key_size, my_nodeinfo.public_key);
+        RegenerateOrGeneratePrivateKey(my_nodeinfo.private_key, my_nodeinfo.public_key_size, my_nodeinfo.public_key);
     }
 };
 

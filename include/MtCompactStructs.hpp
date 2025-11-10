@@ -74,7 +74,6 @@ class MCT_NodeInfo {
 class MCT_MyNodeInfo : public MCT_NodeInfo {
    public:
     uint8_t private_key[32];
-    uint8_t private_key_size;
 };
 
 struct MCT_Waypoint {
