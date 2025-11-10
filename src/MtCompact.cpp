@@ -1059,7 +1059,7 @@ void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint8
     entry.header.hop_start = send_hop_limit;
     entry.header.chan_hash = chan;
     entry.header.via_mqtt = 0;
-    entry.encType = 1;
+    entry.encType = 0;
     entry.data.payload.size = text.size();
     memcpy(entry.data.payload.bytes, text.data(), text.size());
     entry.data.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;  // NodeInfo portnum
