@@ -111,7 +111,7 @@ class MtCompact {
      * @param long_name
      */
     void setMyNames(const char* short_name, const char* long_name);
-    MCT_NodeInfo* getMyNodeInfo() {
+    MCT_MyNodeInfo* getMyNodeInfo() {
         return &my_nodeinfo;
     }
 
@@ -235,6 +235,11 @@ class MtCompactHelpers {
     static void TelemetryEnvironmentBuilder(MCT_Telemetry_Environment& telemetry, float temperature = -10000.0f, float humidity = -1.0f, float pressure = -1.0f, float lux = -1.0f);
     static void WaypointBuilder(MCT_Waypoint& waypoint, uint32_t id, float latitude, float longitude, std::string name, std::string description, uint32_t expire = 1, uint32_t icon = 0);
     static void GeneratePrivateKey(uint8_t* private_key, uint8_t& key_size, uint8_t* public_key);
+    static void RegenerateOrGeneratePrivateKey(uint8_t* private_key, uint8_t& key_size, uint8_t* public_key);
+    static void RegenerateOrGeneratePrivateKey(MCT_MyNodeInfo& my_nodeinfo) {
+        RegenerateOrGeneratePrivateKey(my_nodeinfo.private_key, my_nodeinfo.private_key_size, my_nodeinfo.public_key);
+    }
+    static bool encryptCurve25519(uint32_t toNode, uint32_t fromNode, uint8_t* remotePublic, uint64_t packetNum, size_t numBytes, const uint8_t* bytes, uint8_t* bytesOut);
 };
 
 #endif  // MESHTASTIC_COMPACT_H

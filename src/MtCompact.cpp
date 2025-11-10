@@ -8,6 +8,13 @@
 #include "meshtastic/remote_hardware.pb.h"
 #include "meshtastic/telemetry.pb.h"
 #include "esp_mac.h"
+
+#include <Crypto.h>
+#include <Curve25519.h>
+#include <RNG.h>
+#include <SHA256.h>
+#define CryptRNG RNG
+
 #define TAG "MtCompact"
 
 #define PACKET_FLAGS_HOP_LIMIT_MASK 0x07
@@ -1314,6 +1321,46 @@ void MtCompactHelpers::WaypointBuilder(MCT_Waypoint& waypoint, uint32_t id, floa
 }
 
 void MtCompactHelpers::GeneratePrivateKey(uint8_t* private_key, uint8_t& key_size, uint8_t* public_key) {
+    CryptRNG.begin("MeshCompactRNG");
+    auto noise = random();
+    CryptRNG.stir((uint8_t*)&noise, sizeof(noise));
+    Curve25519::dh1(public_key, private_key);
+    key_size = 32;
+}
+
+void MtCompactHelpers::RegenerateOrGeneratePrivateKey(uint8_t* private_key, uint8_t& key_size, uint8_t* public_key) {
+    if (!Curve25519::eval(public_key, private_key, 0)) {
+        ESP_LOGI("MtCompactHelpers", "Regenerating private key as existing one is invalid");
+        GeneratePrivateKey(private_key, key_size, public_key);
+        return;
+    }
+    key_size = 32;
+}
+
+bool MtCompactHelpers::encryptCurve25519(uint32_t toNode, uint32_t fromNode, uint8_t* remotePublic, uint64_t packetNum, size_t numBytes, const uint8_t* bytes, uint8_t* bytesOut) {
+    uint8_t* auth;
+    long extraNonceTmp = random();
+    /* auth = bytesOut + numBytes;
+     memcpy((uint8_t*)(auth + 8), &extraNonceTmp,
+            sizeof(uint32_t));  // do not use dereference on potential non aligned pointers : *extraNonce = extraNonceTmp;
+     LOG_DEBUG("Random nonce value: %d", extraNonceTmp);
+     if (remotePublic.size == 0) {
+         LOG_DEBUG("Node %d or their public_key not found", toNode);
+         return false;
+     }
+     if (!crypto->setDHPublicKey(remotePublic.bytes)) {
+         return false;
+     }
+     crypto->hash(shared_key, 32);
+     initNonce(fromNode, packetNum, extraNonceTmp);
+
+     // Calculate the shared secret with the destination node and encrypt
+     // printBytes("Attempt encrypt with nonce: ", nonce, 13);
+     // printBytes("Attempt encrypt with shared_key starting with: ", shared_key, 8);
+     aes_ccm_ae(shared_key, 32, nonce, 8, bytes, numBytes, nullptr, 0, bytesOut, auth);  // this can write up to 15 bytes longer than numbytes past bytesOut
+     memcpy((uint8_t*)(auth + 8), &extraNonceTmp, sizeof(uint32_t));                     // do not use dereference on potential non aligned pointers : *extraNonce = extraNonceTmp;
+     */
+    return true;
 }
 
 #pragma endregion

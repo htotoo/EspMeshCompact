@@ -41,6 +41,7 @@ extern "C" void app_main(void) {
     MtCompactHelpers::PositionBuilder(mesh.my_position, 47.497913, 19.040236, 120);
     mesh.setSendEnabled(true);
     mesh.setSendHopLimit(7);
+    MtCompactHelpers::RegenerateOrGeneratePrivateKey(*mesh.getMyNodeInfo());
 
     printf("Hello, world!\n");
     while (true) {
