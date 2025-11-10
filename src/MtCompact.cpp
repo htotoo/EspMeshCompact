@@ -246,8 +246,8 @@ bool MtCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConf
         return false;
     }
 
-    RadioListen();    // Start listening for packets
-    RadioSendInit();  // Start the send task
+    radioListen();    // Start listening for packets
+    radioSendInit();  // Start the send task
     return true;
 }
 
@@ -383,7 +383,7 @@ void MtCompact::task_listen(void* pvParameters) {
                 if (mshcomp->onRaw) {
                     mshcomp->onRaw(rxData, rxLen);
                 }
-                mshcomp->ProcessPacket(rxData, rxLen, mshcomp);
+                mshcomp->processPacket(rxData, rxLen, mshcomp);
             }
 
             if (err < 0) {
@@ -405,12 +405,12 @@ void MtCompact::task_listen(void* pvParameters) {
     vTaskDelete(NULL);
 }
 
-bool MtCompact::RadioListen() {
-    xTaskCreate(&task_listen, "RadioListen", 1024 * 4, this, 5, NULL);
+bool MtCompact::radioListen() {
+    xTaskCreate(&task_listen, "radioListen", 1024 * 4, this, 5, NULL);
     return true;
 }
 
-bool MtCompact::RadioSendInit() {
+bool MtCompact::radioSendInit() {
     // Start the send task
     xTaskCreate(&task_send, "RadioSend", 1024 * 4, this, 5, NULL);
     return true;
@@ -434,7 +434,7 @@ void MtCompact::intOnPositionMessage(MCT_Header& header, meshtastic_Position& po
     }
     if (want_reply && is_auto_full_node && is_send_enabled) {
         ESP_LOGI(TAG, "AUTO Sending my pos info to node 0x%08" PRIx32, header.srcnode);
-        SendMyPosition(header.srcnode);
+        sendMyPosition(header.srcnode);
     }
 }
 
@@ -461,7 +461,7 @@ void MtCompact::intOnNodeInfo(MCT_Header& header, meshtastic_User& user_msg, boo
     }
     if (want_reply && is_auto_full_node && is_send_enabled) {
         ESP_LOGI(TAG, "AUTO Sending my node info to node 0x%08" PRIx32, header.srcnode);
-        SendMyNodeInfo(header.srcnode);
+        sendMyNodeInfo(header.srcnode);
     }
 }
 void MtCompact::intOnWaypointMessage(MCT_Header& header, meshtastic_Waypoint& waypoint_msg) {
@@ -555,7 +555,7 @@ void MtCompact::intOnTraceroute(MCT_Header& header, meshtastic_RouteDiscovery& r
                     route_discovery.snr_towards[route_discovery.snr_towards_count - 1] = header.snr;
                 }
                 // send the reply
-                SendTracerouteReply(header, route_discovery);
+                sendTracerouteReply(header, route_discovery);
             }
         } else {
             // we got a reply
@@ -596,12 +596,12 @@ void MtCompact::intOnTraceroute(MCT_Header& header, meshtastic_RouteDiscovery& r
                 }
             }
             header.hop_limit--;  // Decrease hop limit
-            SendTracerouteReply(header, route_discovery);
+            sendTracerouteReply(header, route_discovery);
         }
     }
 }
 
-int16_t MtCompact::ProcessPacket(uint8_t* data, int len, MtCompact* mshcomp) {
+int16_t MtCompact::processPacket(uint8_t* data, int len, MtCompact* mshcomp) {
     if (len > 0) {
         // https://meshtastic.org/docs/overview/mesh-algo/#layer-1-unreliable-zero-hop-messaging
         if (len < 0x10) {
@@ -921,7 +921,7 @@ void MtCompact::send_ack(MCT_Header& header) {
     out_queue.push(entry);
 }
 
-void MtCompact::SendTracerouteReply(MCT_Header& header, MCT_RouteDiscovery& route_discovery) {
+void MtCompact::sendTracerouteReply(MCT_Header& header, MCT_RouteDiscovery& route_discovery) {
     if (!is_send_enabled) return;
     if (is_in_stealth_mode) return;
 
@@ -963,7 +963,7 @@ void MtCompact::SendTracerouteReply(MCT_Header& header, MCT_RouteDiscovery& rout
     out_queue.push(entry);
 }
 
-void MtCompact::SendTraceroute(uint32_t dest_node_id, uint8_t chan, uint32_t sender_node_id) {
+void MtCompact::sendTraceroute(uint32_t dest_node_id, uint8_t chan, uint32_t sender_node_id) {
     if (!is_send_enabled) return;
     if (is_in_stealth_mode) return;
 
@@ -990,7 +990,7 @@ void MtCompact::SendTraceroute(uint32_t dest_node_id, uint8_t chan, uint32_t sen
     out_queue.push(entry);
 }
 
-void MtCompact::SendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode, bool exchange) {
+void MtCompact::sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode, bool exchange) {
     if (!is_send_enabled) return;
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dstnode;
@@ -1035,7 +1035,7 @@ void MtCompact::SendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode, bool exch
     out_queue.push(entry);
 }
 
-void MtCompact::SendTextMessage(const std::string& text, uint32_t dstnode, uint8_t chan, MCT_MESSAGE_TYPE type, uint32_t sender_node_id) {
+void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint8_t chan, MCT_MESSAGE_TYPE type, uint32_t sender_node_id) {
     if (!is_send_enabled) return;
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dstnode;
@@ -1060,7 +1060,7 @@ void MtCompact::SendTextMessage(const std::string& text, uint32_t dstnode, uint8
     out_queue.push(entry);
 }
 
-void MtCompact::SendRequestPositionInfo(uint32_t dest_node_id, uint8_t chan, uint32_t sender_node_id) {
+void MtCompact::sendRequestPositionInfo(uint32_t dest_node_id, uint8_t chan, uint32_t sender_node_id) {
     if (!is_send_enabled) return;  // todo check if this works or deletes the position
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dest_node_id;
@@ -1085,7 +1085,7 @@ void MtCompact::SendRequestPositionInfo(uint32_t dest_node_id, uint8_t chan, uin
     out_queue.push(entry);
 }
 
-void MtCompact::SendPositionMessage(MCT_Position& position, uint32_t dstnode, uint8_t chan, uint32_t sender_node_id) {
+void MtCompact::sendPositionMessage(MCT_Position& position, uint32_t dstnode, uint8_t chan, uint32_t sender_node_id) {
     if (!is_send_enabled) return;
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dstnode;
@@ -1123,7 +1123,7 @@ void MtCompact::SendPositionMessage(MCT_Position& position, uint32_t dstnode, ui
     out_queue.push(entry);
 }
 
-void MtCompact::SendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode, uint8_t chan, uint32_t sender_node_id) {
+void MtCompact::sendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode, uint8_t chan, uint32_t sender_node_id) {
     if (!is_send_enabled) return;
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dstnode;
@@ -1156,7 +1156,7 @@ void MtCompact::SendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode, ui
     out_queue.push(entry);
 }
 
-void MtCompact::SendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t dstnode, uint8_t chan, uint32_t sender_node_id) {
+void MtCompact::sendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t dstnode, uint8_t chan, uint32_t sender_node_id) {
     if (!is_send_enabled) return;
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dstnode;
@@ -1192,7 +1192,7 @@ void MtCompact::SendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t ds
     out_queue.push(entry);
 }
 
-void MtCompact::SendTelemetryEnvironment(MCT_Telemetry_Environment& telemetry, uint32_t dstnode, uint8_t chan, uint32_t sender_node_id) {
+void MtCompact::sendTelemetryEnvironment(MCT_Telemetry_Environment& telemetry, uint32_t dstnode, uint8_t chan, uint32_t sender_node_id) {
     if (!is_send_enabled) return;
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dstnode;
@@ -1236,7 +1236,7 @@ inline uint8_t MtCompact::getLastByteOfNodeNum(uint32_t num) {
 
 #pragma region MeshtasticCompactHelpers
 
-void MeshtasticCompactHelpers::NodeInfoBuilder(MCT_NodeInfo* nodeinfo, uint32_t node_id, std::string& short_name, std::string& long_name, uint8_t hw_model) {
+void MtCompactHelpers::NodeInfoBuilder(MCT_NodeInfo* nodeinfo, uint32_t node_id, std::string& short_name, std::string& long_name, uint8_t hw_model) {
     nodeinfo->node_id = node_id;
     if (long_name.empty()) {
         char hex_part[7];
@@ -1268,7 +1268,7 @@ void MeshtasticCompactHelpers::NodeInfoBuilder(MCT_NodeInfo* nodeinfo, uint32_t 
     nodeinfo->hw_model = hw_model;  // Set hardware model
 }
 
-void MeshtasticCompactHelpers::PositionBuilder(MCT_Position& position, float latitude, float longitude, int32_t altitude, uint32_t speed, uint32_t sats_in_view) {
+void MtCompactHelpers::PositionBuilder(MCT_Position& position, float latitude, float longitude, int32_t altitude, uint32_t speed, uint32_t sats_in_view) {
     position.latitude_i = static_cast<int32_t>(latitude * 10e6);
     position.longitude_i = static_cast<int32_t>(longitude * 10e6);
     position.altitude = altitude;
@@ -1277,7 +1277,7 @@ void MeshtasticCompactHelpers::PositionBuilder(MCT_Position& position, float lat
     position.location_source = 0;
 }
 
-void MeshtasticCompactHelpers::TelemetryDeviceBuilder(MCT_Telemetry_Device& telemetry, uint32_t uptime_seconds, float voltage, float battery_level, float channel_utilization) {
+void MtCompactHelpers::TelemetryDeviceBuilder(MCT_Telemetry_Device& telemetry, uint32_t uptime_seconds, float voltage, float battery_level, float channel_utilization) {
     telemetry.uptime_seconds = uptime_seconds;
     telemetry.voltage = voltage;
     telemetry.battery_level = battery_level;
@@ -1288,7 +1288,7 @@ void MeshtasticCompactHelpers::TelemetryDeviceBuilder(MCT_Telemetry_Device& tele
     telemetry.has_channel_utilization = (channel_utilization >= 0.0f);
 }
 
-void MeshtasticCompactHelpers::TelemetryEnvironmentBuilder(MCT_Telemetry_Environment& telemetry, float temperature, float humidity, float pressure, float lux) {
+void MtCompactHelpers::TelemetryEnvironmentBuilder(MCT_Telemetry_Environment& telemetry, float temperature, float humidity, float pressure, float lux) {
     telemetry.temperature = temperature;
     telemetry.humidity = humidity;
     telemetry.pressure = pressure;
@@ -1299,7 +1299,7 @@ void MeshtasticCompactHelpers::TelemetryEnvironmentBuilder(MCT_Telemetry_Environ
     telemetry.has_lux = (lux >= 0.0f);
 }
 
-void MeshtasticCompactHelpers::WaypointBuilder(MCT_Waypoint& waypoint, uint32_t id, float latitude, float longitude, std::string name, std::string description, uint32_t expire, uint32_t icon) {
+void MtCompactHelpers::WaypointBuilder(MCT_Waypoint& waypoint, uint32_t id, float latitude, float longitude, std::string name, std::string description, uint32_t expire, uint32_t icon) {
     waypoint.latitude_i = static_cast<int32_t>(latitude * 10e6);
     waypoint.longitude_i = static_cast<int32_t>(longitude * 10e6);
     strncpy(waypoint.name, name.c_str(), sizeof(waypoint.name) - 1);

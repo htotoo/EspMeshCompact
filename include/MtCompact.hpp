@@ -115,24 +115,24 @@ class MtCompact {
         return &my_nodeinfo;
     }
 
-    void set_ok_to_mqtt(bool ok) { ok_to_mqtt = ok; }  // if true, sets the flag in the header
+    void setOkToMqtt(bool ok) { ok_to_mqtt = ok; }  // if true, sets the flag in the header
 
     // packet senders
-    void SendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode = 0xffffffff, bool exchange = false);
-    void SendMyNodeInfo(uint32_t dstnode = 0xffffffff, bool exchange = false) {
-        SendNodeInfo(my_nodeinfo, dstnode, exchange);
+    void sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode = 0xffffffff, bool exchange = false);
+    void sendMyNodeInfo(uint32_t dstnode = 0xffffffff, bool exchange = false) {
+        sendNodeInfo(my_nodeinfo, dstnode, exchange);
     }
-    void SendTextMessage(const std::string& text, uint32_t dstnode = 0xffffffff, uint8_t chan = 0, MCT_MESSAGE_TYPE type = MCT_MESSAGE_TYPE_TEXT, uint32_t sender_node_id = 0);
-    void SendPositionMessage(MCT_Position& position, uint32_t dstnode = 0xffffffff, uint8_t chan = 8, uint32_t sender_node_id = 0);
-    void SendMyPosition(uint32_t dstnode = 0xffffffff, uint8_t chan = 8) {
-        SendPositionMessage(my_position, dstnode, chan);
+    void sendTextMessage(const std::string& text, uint32_t dstnode = 0xffffffff, uint8_t chan = 0, MCT_MESSAGE_TYPE type = MCT_MESSAGE_TYPE_TEXT, uint32_t sender_node_id = 0);
+    void sendPositionMessage(MCT_Position& position, uint32_t dstnode = 0xffffffff, uint8_t chan = 8, uint32_t sender_node_id = 0);
+    void sendMyPosition(uint32_t dstnode = 0xffffffff, uint8_t chan = 8) {
+        sendPositionMessage(my_position, dstnode, chan);
     }
-    void SendRequestPositionInfo(uint32_t dest_node_id, uint8_t chan = 8, uint32_t sender_node_id = 0);
-    void SendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode = 0xffffffff, uint8_t chan = 8, uint32_t sender_node_id = 0);
-    void SendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t dstnode = 0xffffffff, uint8_t chan = 8, uint32_t sender_node_id = 0);
-    void SendTelemetryEnvironment(MCT_Telemetry_Environment& telemetry, uint32_t dstnode = 0xffffffff, uint8_t chan = 8, uint32_t sender_node_id = 0);
-    void SendTracerouteReply(MCT_Header& header, MCT_RouteDiscovery& route_discovery);
-    void SendTraceroute(uint32_t dest_node_id, uint8_t chan = 8, uint32_t sender_node_id = 0);
+    void sendRequestPositionInfo(uint32_t dest_node_id, uint8_t chan = 8, uint32_t sender_node_id = 0);
+    void sendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode = 0xffffffff, uint8_t chan = 8, uint32_t sender_node_id = 0);
+    void sendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t dstnode = 0xffffffff, uint8_t chan = 8, uint32_t sender_node_id = 0);
+    void sendTelemetryEnvironment(MCT_Telemetry_Environment& telemetry, uint32_t dstnode = 0xffffffff, uint8_t chan = 8, uint32_t sender_node_id = 0);
+    void sendTracerouteReply(MCT_Header& header, MCT_RouteDiscovery& route_discovery);
+    void sendTraceroute(uint32_t dest_node_id, uint8_t chan = 8, uint32_t sender_node_id = 0);
 
     // Radio settings on the fly
     bool setRadioFrequency(float freq);
@@ -148,13 +148,13 @@ class MtCompact {
         MtCompactFileIO::loadNodeDb(nodeinfo_db);
     }
 
-    NodeInfoDB nodeinfo_db;          // NodeInfo database.
-    MtCompactRouter router;  // Router for message deduplication. Set MyId if you changed that. Also you can disable exclude self option
-    MCT_Position my_position;        // My position, used for auto replies (when enabled) on position requests. Or when you call SendMyPosition()
+    NodeInfoDB nodeinfo_db;    // NodeInfo database.
+    MtCompactRouter router;    // Router for message deduplication. Set MyId if you changed that. Also you can disable exclude self option
+    MCT_Position my_position;  // My position, used for auto replies (when enabled) on position requests. Or when you call sendMyPosition()
    private:
     RadioType radio_type;
-    bool RadioListen();    // inits the listening thread for the radio
-    bool RadioSendInit();  // inits the sending thread for the radio. consumes the out_queue
+    bool radioListen();    // inits the listening thread for the radio
+    bool radioSendInit();  // inits the sending thread for the radio. consumes the out_queue
     // handlers
     void intOnMessage(MCT_Header& header, MCT_TextMessage& message);                                // Called when got any text based messages
     void intOnPositionMessage(MCT_Header& header, meshtastic_Position& position, bool want_reply);  // Called on position messages
@@ -169,7 +169,7 @@ class MtCompact {
     void send_ack(MCT_Header& header);  // sends an ack packet to the source node based on the header
 
     // decoding
-    int16_t ProcessPacket(uint8_t* data, int len, MtCompact* mshcomp);  // Process the packet, decode it, and call the appropriate handler
+    int16_t processPacket(uint8_t* data, int len, MtCompact* mshcomp);  // Process the packet, decode it, and call the appropriate handler
 
     int16_t try_decode_root_packet(const uint8_t* srcbuf, size_t srcbufsize, const pb_msgdesc_t* fields, void* dest_struct, size_t dest_struct_size, MCT_Header& header);                // the simple packet decoder for any type of encrypted messages.
     bool pb_decode_from_bytes(const uint8_t* srcbuf, size_t srcbufsize, const pb_msgdesc_t* fields, void* dest_struct);                                                                  // decode the protobuf message from bytes
@@ -227,7 +227,7 @@ class MtCompact {
  * @brief Simple static helpers for building message objects easily.
  *
  */
-class MeshtasticCompactHelpers {
+class MtCompactHelpers {
    public:
     static void NodeInfoBuilder(MCT_NodeInfo* nodeinfo, uint32_t node_id, std::string& short_name, std::string& long_name, uint8_t hw_model);
     static void PositionBuilder(MCT_Position& position, float latitude, float longitude, int32_t altitude = 0, uint32_t speed = 0, uint32_t sats_in_view = 0);
