@@ -1,5 +1,5 @@
 version: "0.0.3"
-description: "Meshtastic but as a library"
+description: "Mesh library (MT,MC)"
 url: "https://github.com/htotoo/EspMeshCompact"
 repository: "https://github.com/htotoo/EspMeshCompact"
 issues: "https://github.com/htotoo/EspMeshCompact/issues"

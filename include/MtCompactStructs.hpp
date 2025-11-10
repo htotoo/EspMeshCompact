@@ -57,7 +57,8 @@ struct MCT_Position {
     bool has_ground_speed;
 };
 
-struct MCT_NodeInfo {
+class MCT_NodeInfo {
+   public:
     uint32_t node_id;         // src
     char id[16];              // Node ID
     char short_name[5];       // Short name of the node
@@ -68,6 +69,12 @@ struct MCT_NodeInfo {
     uint8_t public_key_size;  // Size of the public key
     uint8_t role;             // Role of the node
     uint32_t last_updated;    // Last updated timestamp
+};
+
+class MCT_MyNodeInfo : public MCT_NodeInfo {
+   public:
+    uint8_t private_key[32];
+    uint8_t private_key_size;
 };
 
 struct MCT_Waypoint {

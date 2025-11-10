@@ -187,7 +187,7 @@ class MtCompact {
 
     bool ok_to_mqtt = true;  // set or don't set the flag.
 
-    MCT_NodeInfo my_nodeinfo;  // My node info. Used in many places. Set it carefully.
+    MCT_MyNodeInfo my_nodeinfo;  // My node info. Used in many places. Set it carefully.
 
     EspHal* hal;           // = new EspHal(9, 11, 10);
     PhysicalLayer* radio;  // SX1262 radio = new Module(hal, 8, 14, 12, 13);
@@ -234,6 +234,7 @@ class MtCompactHelpers {
     static void TelemetryDeviceBuilder(MCT_Telemetry_Device& telemetry, uint32_t uptime_seconds = 0, float voltage = 0.0f, float battery_level = -1.0f, float channel_utilization = -1.0f);
     static void TelemetryEnvironmentBuilder(MCT_Telemetry_Environment& telemetry, float temperature = -10000.0f, float humidity = -1.0f, float pressure = -1.0f, float lux = -1.0f);
     static void WaypointBuilder(MCT_Waypoint& waypoint, uint32_t id, float latitude, float longitude, std::string name, std::string description, uint32_t expire = 1, uint32_t icon = 0);
+    static void GeneratePrivateKey(uint8_t* private_key, uint8_t& key_size, uint8_t* public_key);
 };
 
 #endif  // MESHTASTIC_COMPACT_H

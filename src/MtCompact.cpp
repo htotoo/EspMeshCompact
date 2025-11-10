@@ -1312,4 +1312,8 @@ void MtCompactHelpers::WaypointBuilder(MCT_Waypoint& waypoint, uint32_t id, floa
     waypoint.has_latitude_i = waypoint.latitude_i != 0;
     waypoint.has_longitude_i = waypoint.longitude_i != 0;
 }
+
+void MtCompactHelpers::GeneratePrivateKey(uint8_t* private_key, uint8_t& key_size, uint8_t* public_key) {
+}
+
 #pragma endregion
