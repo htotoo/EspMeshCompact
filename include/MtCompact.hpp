@@ -21,6 +21,7 @@
 #include "MtCompactRouter.hpp"
 #include "MtCompactOutQueue.hpp"
 #include "MtCompactFileIO.hpp"
+#include "AES.h"
 
 // https://github.com/meshtastic/firmware/blob/81828c6244daede254cf759a0f2bd939b2e7dd65/variants/heltec_wsl_v3/variant.h
 
@@ -164,6 +165,12 @@ class MtCompact {
     void intOnTelemetryEnvironment(MCT_Header& header, _meshtastic_Telemetry& telemetry_msg);       // Called on telemetry environment messages
     void intOnTraceroute(MCT_Header& header, meshtastic_RouteDiscovery& route_discovery_msg);       // Called on traceroute messages
 
+    // crypto
+    bool encryptCurve25519(uint32_t toNode, uint32_t fromNode, uint8_t* remotePublic, uint64_t packetNum, size_t numBytes, const uint8_t* bytes, uint8_t* bytesOut);
+    bool setDHPublicKey(uint8_t* pubKey);
+    void hash(uint8_t* bytes, size_t numBytes);
+    void initNonce(uint32_t fromNode, uint64_t packetId, uint32_t extraNonce);
+
     // mesh network minimum functionality
 
     void send_ack(MCT_Header& header);  // sends an ack packet to the source node based on the header
@@ -200,6 +207,10 @@ class MtCompact {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};  // default channel key
+
+    uint8_t shared_key[32] = {0};
+    uint8_t nonce[16] = {0};
+    AESSmall256* aes = NULL;
 
     mbedtls_aes_context aes_ctx;
     mutable std::mutex mtx_radio;
@@ -239,7 +250,6 @@ class MtCompactHelpers {
     static void RegenerateOrGeneratePrivateKey(MCT_MyNodeInfo& my_nodeinfo) {
         RegenerateOrGeneratePrivateKey(my_nodeinfo.private_key, my_nodeinfo.private_key_size, my_nodeinfo.public_key);
     }
-    static bool encryptCurve25519(uint32_t toNode, uint32_t fromNode, uint8_t* remotePublic, uint64_t packetNum, size_t numBytes, const uint8_t* bytes, uint8_t* bytesOut);
 };
 
 #endif  // MESHTASTIC_COMPACT_H

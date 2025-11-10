@@ -42,9 +42,8 @@ extern "C" void app_main(void) {
     mesh.setSendEnabled(true);
     mesh.setSendHopLimit(7);
     MtCompactHelpers::RegenerateOrGeneratePrivateKey(*mesh.getMyNodeInfo());
-
-    printf("Hello, world!\n");
+    mesh.sendMyNodeInfo();
     while (true) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(10000));
     }
 }

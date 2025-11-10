@@ -13,6 +13,8 @@
 #include <Curve25519.h>
 #include <RNG.h>
 #include <SHA256.h>
+#include "aes-ccm.h"
+
 #define CryptRNG RNG
 
 #define TAG "MtCompact"
@@ -290,6 +292,7 @@ void MtCompact::task_send(void* pvParameters) {
             // Encrypt the payload if needed
             uint8_t encrypted_payload[256];
             bool aesenc = true;
+            uint8_t dstpub[32];
             if (entry.encType == 0) {  // the auto enc method
                 MCT_NodeInfo* dstnode = mshcomp->nodeinfo_db.get(entry.header.dstnode);
                 if (entry.header.chan_hash == 0 && entry.header.dstnode != 0xffffffff && dstnode && (dstnode->public_key_size == 16 || dstnode->public_key_size == 32)) {
@@ -302,6 +305,7 @@ void MtCompact::task_send(void* pvParameters) {
                     }
                     if (!all_zero) {
                         aesenc = false;
+                        memcpy(dstpub, dstnode->public_key, dstnode->public_key_size);
                     }
                 }
             }
@@ -313,6 +317,7 @@ void MtCompact::task_send(void* pvParameters) {
 
             if (!aesenc) {
                 // private message, encrypt with that method if pubkey is availeable //todo
+                mshcomp->encryptCurve25519(entry.header.dstnode, entry.header.srcnode, dstpub, entry.header.packet_id, payload_len, payload, encrypted_payload);
                 continue;
             } else {
                 if (mshcomp->aes_decrypt_meshtastic_payload(entry.key, entry.key_len * 8, entry.header.packet_id, entry.header.srcnode, payload, encrypted_payload, payload_len)) {
@@ -1239,6 +1244,61 @@ inline uint8_t MtCompact::getLastByteOfNodeNum(uint32_t num) {
     return (uint8_t)((num & 0xFF) ? (num & 0xFF) : 0xFF);
 }
 
+void MtCompact::hash(uint8_t* bytes, size_t numBytes) {
+    SHA256 hash;
+    size_t posn;
+    uint8_t size = numBytes;
+    uint8_t inc = 16;
+    hash.reset();
+    for (posn = 0; posn < size; posn += inc) {
+        size_t len = size - posn;
+        if (len > inc)
+            len = inc;
+        hash.update(bytes + posn, len);
+    }
+    hash.finalize(bytes, 32);
+}
+
+void MtCompact::initNonce(uint32_t fromNode, uint64_t packetId, uint32_t extraNonce) {
+    memset(nonce, 0, sizeof(nonce));
+
+    // use memcpy to avoid breaking strict-aliasing
+    memcpy(nonce, &packetId, sizeof(uint64_t));
+    memcpy(nonce + sizeof(uint64_t), &fromNode, sizeof(uint32_t));
+    if (extraNonce)
+        memcpy(nonce + sizeof(uint32_t), &extraNonce, sizeof(uint32_t));
+}
+
+bool MtCompact::encryptCurve25519(uint32_t toNode, uint32_t fromNode, uint8_t* remotePublic, uint64_t packetNum, size_t numBytes, const uint8_t* bytes, uint8_t* bytesOut) {
+    uint8_t* auth;
+    long extraNonceTmp = random();
+    auth = bytesOut + numBytes;
+    memcpy((uint8_t*)(auth + 8), &extraNonceTmp,
+           sizeof(uint32_t));  // do not use dereference on potential non aligned pointers : *extraNonce = extraNonceTmp;
+    if (!setDHPublicKey(remotePublic)) {
+        return false;
+    }
+    hash(shared_key, 32);
+    initNonce(fromNode, packetNum, extraNonceTmp);
+    // Calculate the shared secret with the destination node and encrypt
+    aes_ccm_ae(shared_key, 32, nonce, 8, bytes, numBytes, nullptr, 0, bytesOut, auth, aes);  // this can write up to 15 bytes longer than numbytes past bytesOut
+    memcpy((uint8_t*)(auth + 8), &extraNonceTmp, sizeof(uint32_t));                          // do not use dereference on potential non aligned pointers : *extraNonce = extraNonceTmp;
+    return true;
+}
+
+bool MtCompact::setDHPublicKey(uint8_t* pubKey) {
+    uint8_t local_priv[32];
+    memcpy(shared_key, pubKey, 32);
+    memcpy(local_priv, my_nodeinfo.private_key, my_nodeinfo.private_key_size);
+    // Calculate the shared secret with the specified node's public key and our private key
+    // This includes an internal weak key check, which among other things looks for an all 0 public key and shared key.
+    if (!Curve25519::dh2(shared_key, local_priv)) {
+        ESP_LOGE("MT_CRYPTO", "Curve25519DH step 2 failed!");
+        return false;
+    }
+    return true;
+}
+
 #pragma endregion
 
 #pragma region MeshtasticCompactHelpers
@@ -1335,32 +1395,6 @@ void MtCompactHelpers::RegenerateOrGeneratePrivateKey(uint8_t* private_key, uint
         return;
     }
     key_size = 32;
-}
-
-bool MtCompactHelpers::encryptCurve25519(uint32_t toNode, uint32_t fromNode, uint8_t* remotePublic, uint64_t packetNum, size_t numBytes, const uint8_t* bytes, uint8_t* bytesOut) {
-    uint8_t* auth;
-    long extraNonceTmp = random();
-    /* auth = bytesOut + numBytes;
-     memcpy((uint8_t*)(auth + 8), &extraNonceTmp,
-            sizeof(uint32_t));  // do not use dereference on potential non aligned pointers : *extraNonce = extraNonceTmp;
-     LOG_DEBUG("Random nonce value: %d", extraNonceTmp);
-     if (remotePublic.size == 0) {
-         LOG_DEBUG("Node %d or their public_key not found", toNode);
-         return false;
-     }
-     if (!crypto->setDHPublicKey(remotePublic.bytes)) {
-         return false;
-     }
-     crypto->hash(shared_key, 32);
-     initNonce(fromNode, packetNum, extraNonceTmp);
-
-     // Calculate the shared secret with the destination node and encrypt
-     // printBytes("Attempt encrypt with nonce: ", nonce, 13);
-     // printBytes("Attempt encrypt with shared_key starting with: ", shared_key, 8);
-     aes_ccm_ae(shared_key, 32, nonce, 8, bytes, numBytes, nullptr, 0, bytesOut, auth);  // this can write up to 15 bytes longer than numbytes past bytesOut
-     memcpy((uint8_t*)(auth + 8), &extraNonceTmp, sizeof(uint32_t));                     // do not use dereference on potential non aligned pointers : *extraNonce = extraNonceTmp;
-     */
-    return true;
 }
 
 #pragma endregion
