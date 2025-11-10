@@ -1,11 +1,11 @@
 #pragma once
-#include "MeshcoreCompactStructs.hpp"
+#include "McCompactStructs.hpp"
 
 // todo add decode function, and encode function, and search by the channel hash (1st byte of secret)
-class MeshcoreCompatChanMgr {
+class McCompatChanMgr {
    public:
-    MeshcoreCompatChanMgr();
-    ~MeshcoreCompatChanMgr();
+    McCompatChanMgr();
+    ~McCompatChanMgr();
 
     bool addChannel(const std::string& name, const uint8_t* secret, size_t size);
     bool addChannel(const std::string& name, const std::string& secret);

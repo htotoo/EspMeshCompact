@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <mutex>
 
-class MeshtasticCompactRouter {
+class MtCompactRouter {
    public:
     static constexpr size_t MAX_ENTRIES = 20;
 
@@ -15,7 +15,7 @@ class MeshtasticCompactRouter {
     void setExcludeSelf(bool value) { exclude_self = value; }  // Please don't adjust this unless you know what you are doing!
     void setMyId(uint32_t id) { my_id = id; }
 
-    MeshtasticCompactRouter() : count(0), head(0) {}
+    MtCompactRouter() : count(0), head(0) {}
 
     // Returns true if (src, msgid) was not present and is now inserted, false if already present
     bool onCheck(uint32_t src, uint32_t msgid) {

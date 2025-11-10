@@ -1,11 +1,11 @@
 
-#include "MeshtasticCompactFileIO.hpp"
+#include "MtCompactFileIO.hpp"
 #include <nvs_flash.h>
 #include <nvs.h>
 #include <vector>
 #include "esp_log.h"
 
-bool MeshtasticCompactFileIO::saveNodeDb(NodeInfoDB& db) {
+bool MtCompactFileIO::saveNodeDb(NodeInfoDB& db) {
     nvs_handle_t handle;
     esp_err_t err = nvs_open("meshtastic", NVS_READWRITE, &handle);
     if (err != ESP_OK) {
@@ -40,7 +40,7 @@ bool MeshtasticCompactFileIO::saveNodeDb(NodeInfoDB& db) {
     return false;
 }
 
-bool MeshtasticCompactFileIO::loadNodeDb(NodeInfoDB& db) {
+bool MtCompactFileIO::loadNodeDb(NodeInfoDB& db) {
     nvs_handle_t handle;
     esp_err_t err = nvs_open("meshtastic", NVS_READONLY, &handle);
     if (err != ESP_OK) {
@@ -51,7 +51,7 @@ bool MeshtasticCompactFileIO::loadNodeDb(NodeInfoDB& db) {
     err = nvs_get_u32(handle, "fileio_ver", &fileio_ver);
     if (err != ESP_OK || fileio_ver != FILEIO_VERSION) {
         nvs_close(handle);
-        ESP_LOGI("MeshtasticCompactFileIO", "NVS fileio_ver mismatch or not found.");
+        ESP_LOGI("MtCompactFileIO", "NVS fileio_ver mismatch or not found.");
         return false;
     }
 

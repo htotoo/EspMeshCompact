@@ -1,11 +1,11 @@
 #include "esp_log.h"
-#include "MeshcoreCompatChanMgr.hpp"
+#include "McCompatChanMgr.hpp"
 #include "CompactHelpers.hpp"
-#include "MeshcoreCompact.hpp"
+#include "McCompact.hpp"
 
-MeshcoreCompatChanMgr::MeshcoreCompatChanMgr() {}
-MeshcoreCompatChanMgr::~MeshcoreCompatChanMgr() {}
-bool MeshcoreCompatChanMgr::addChannel(const std::string& name, const uint8_t* secret, size_t size) {
+McCompatChanMgr::McCompatChanMgr() {}
+McCompatChanMgr::~McCompatChanMgr() {}
+bool McCompatChanMgr::addChannel(const std::string& name, const uint8_t* secret, size_t size) {
     MCC_ChannelEntry entry;
     entry.name = name;
     memcpy(entry.secret, secret, size);
@@ -15,13 +15,13 @@ bool MeshcoreCompatChanMgr::addChannel(const std::string& name, const uint8_t* s
     return true;
 }
 
-bool MeshcoreCompatChanMgr::addChannel(const std::string& name, const std::string& secret) {
+bool McCompatChanMgr::addChannel(const std::string& name, const std::string& secret) {
     uint8_t key[32] = {0};
     auto len = CompactHelpers::keyFromString(secret, key);
     return addChannel(name, key, len);
 }
 
-MCC_ChannelEntry* MeshcoreCompatChanMgr::getChannelByName(const std::string& name) {
+MCC_ChannelEntry* McCompatChanMgr::getChannelByName(const std::string& name) {
     for (auto& channel : channels) {
         if (channel.name == name) {
             return &channel;
@@ -30,24 +30,24 @@ MCC_ChannelEntry* MeshcoreCompatChanMgr::getChannelByName(const std::string& nam
     return nullptr;
 }
 
-MCC_ChannelEntry* MeshcoreCompatChanMgr::getChannelByIndex(size_t index) {
+MCC_ChannelEntry* McCompatChanMgr::getChannelByIndex(size_t index) {
     if (index < channels.size()) {
         return &channels[index];
     }
     return nullptr;
 }
 
-size_t MeshcoreCompatChanMgr::getChannelCount() {
+size_t McCompatChanMgr::getChannelCount() {
     return channels.size();
 }
 
-MCC_ChannelEntry* MeshcoreCompatChanMgr::getChannelByHashAndData(uint8_t* payload, size_t payload_len, uint8_t* decoded, size_t& out_decoded_len) {
+MCC_ChannelEntry* McCompatChanMgr::getChannelByHashAndData(uint8_t* payload, size_t payload_len, uint8_t* decoded, size_t& out_decoded_len) {
     // todo
     for (auto& channel : channels) {
         ESP_LOGI("ChanMgr", "Trying channel %s with hash 0x%02x  :   0x%02x ", channel.name.c_str(), channel.hash[0], payload[0]);
         if (channel.hash[0] == payload[0]) {
             ESP_LOGI("ChanMgr", "Channel %s matched hash", channel.name.c_str());
-            auto lenn = MeshcoreCompact::MACThenDecrypt(channel.secret, decoded, payload + 1, payload_len - 1);
+            auto lenn = McCompact::MACThenDecrypt(channel.secret, decoded, payload + 1, payload_len - 1);
             if (lenn > 0) {  // success!
                 // onGroupDataRecv(pkt, pkt->getPayloadType(), channels[j], data, lenn);
                 out_decoded_len = lenn;

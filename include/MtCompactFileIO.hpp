@@ -1,8 +1,8 @@
 #pragma once
 
-#include "MeshtasticCompactNodeInfoDB.hpp"
+#include "MtCompactNodeInfoDB.hpp"
 
-class MeshtasticCompactFileIO {
+class MtCompactFileIO {
    public:
     static const uint8_t FILEIO_VERSION = 1;
     // Save the nodedb

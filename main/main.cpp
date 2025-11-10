@@ -3,7 +3,7 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 
-#include "MeshcoreCompact.hpp"
+#include "McCompact.hpp"
 
 Radio_PINS radio_pins = {9, 11, 10, 8, 14, 12, 13};  // Default radio pins for Heltec WSL V3.
 LoraConfig lora_config = {
@@ -18,7 +18,7 @@ LoraConfig lora_config = {
     .use_regulator_ldo = false,
 };  //
 
-MeshcoreCompact mesh;
+McCompact mesh;
 
 void onRaw(const uint8_t* data, size_t len) {
     printf("Received packet of length %zu: ", len);

@@ -15,9 +15,9 @@
 #include <condition_variable>
 #include <queue>
 #include <deque>
-#include "MeshcoreCompactStructs.hpp"
-#include "MeshcoreCompactNodeInfoDB.hpp"
-#include "MeshcoreCompatChanMgr.hpp"
+#include "McCompactStructs.hpp"
+#include "McCompactNodeInfoDB.hpp"
+#include "McCompatChanMgr.hpp"
 #include "mbedtls/constant_time.h"
 
 #define MAX_PACKET_PAYLOAD 184
@@ -29,10 +29,10 @@
 #define CIPHER_BLOCK_SIZE 16
 #define CIPHER_MAC_SIZE 2
 
-class MeshcoreCompact {
+class McCompact {
    public:
-    MeshcoreCompact();
-    ~MeshcoreCompact();
+    McCompact();
+    ~McCompact();
     bool RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConfig& lora_config);  // Initializes the radio with the given configuration and pins
 
     using OnRaw = void (*)(const uint8_t* data, size_t len);
@@ -56,7 +56,7 @@ class MeshcoreCompact {
     bool setRadioPower(int8_t power);
 
     NodeInfoCoreDB nodeinfo_db{};
-    MeshcoreCompatChanMgr chan_mgr{};
+    McCompatChanMgr chan_mgr{};
 
     static int decrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len);
     static int encrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len);
@@ -74,7 +74,7 @@ class MeshcoreCompact {
     void intOnNodeInfo(MCC_Nodeinfo& info);  // internal handler for nodeinfo packets
 
     // decoding
-    int16_t ProcessPacket(uint8_t* data, int len, MeshcoreCompact* mshcomp);  // Process the packet, decode it, and call the appropriate handler
+    int16_t ProcessPacket(uint8_t* data, int len, McCompact* mshcomp);  // Process the packet, decode it, and call the appropriate handler
 
     static void task_listen(void* pvParameters);  // Task for listening to the radio and processing incoming packets
     static void task_send(void* pvParameters);    // Task for sending packets from the out_queue

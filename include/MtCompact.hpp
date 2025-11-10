@@ -12,22 +12,22 @@
 #include "mbedtls/aes.h"
 #include <string>
 #include "meshtastic/mesh.pb.h"
-#include "MeshtasticCompactStructs.hpp"
+#include "MtCompactStructs.hpp"
 #include <mutex>
 #include <condition_variable>
 #include <queue>
 #include <deque>
-#include "MeshtasticCompactNodeInfoDB.hpp"
-#include "MeshtasticCompactRouter.hpp"
-#include "MeshtasticCompactOutQueue.hpp"
-#include "MeshtasticCompactFileIO.hpp"
+#include "MtCompactNodeInfoDB.hpp"
+#include "MtCompactRouter.hpp"
+#include "MtCompactOutQueue.hpp"
+#include "MtCompactFileIO.hpp"
 
 // https://github.com/meshtastic/firmware/blob/81828c6244daede254cf759a0f2bd939b2e7dd65/variants/heltec_wsl_v3/variant.h
 
-class MeshtasticCompact {
+class MtCompact {
    public:
-    MeshtasticCompact();
-    ~MeshtasticCompact();
+    MtCompact();
+    ~MtCompact();
     bool RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConfig& lora_config);  // Initializes the radio with the given configuration and pins
 
     // callbacks
@@ -142,14 +142,14 @@ class MeshtasticCompact {
     bool setRadioPower(int8_t power);
 
     void saveNodeDb() {
-        MeshtasticCompactFileIO::saveNodeDb(nodeinfo_db);
+        MtCompactFileIO::saveNodeDb(nodeinfo_db);
     }
     void loadNodeDb() {
-        MeshtasticCompactFileIO::loadNodeDb(nodeinfo_db);
+        MtCompactFileIO::loadNodeDb(nodeinfo_db);
     }
 
     NodeInfoDB nodeinfo_db;          // NodeInfo database.
-    MeshtasticCompactRouter router;  // Router for message deduplication. Set MyId if you changed that. Also you can disable exclude self option
+    MtCompactRouter router;  // Router for message deduplication. Set MyId if you changed that. Also you can disable exclude self option
     MCT_Position my_position;        // My position, used for auto replies (when enabled) on position requests. Or when you call SendMyPosition()
    private:
     RadioType radio_type;
@@ -169,7 +169,7 @@ class MeshtasticCompact {
     void send_ack(MCT_Header& header);  // sends an ack packet to the source node based on the header
 
     // decoding
-    int16_t ProcessPacket(uint8_t* data, int len, MeshtasticCompact* mshcomp);  // Process the packet, decode it, and call the appropriate handler
+    int16_t ProcessPacket(uint8_t* data, int len, MtCompact* mshcomp);  // Process the packet, decode it, and call the appropriate handler
 
     int16_t try_decode_root_packet(const uint8_t* srcbuf, size_t srcbufsize, const pb_msgdesc_t* fields, void* dest_struct, size_t dest_struct_size, MCT_Header& header);                // the simple packet decoder for any type of encrypted messages.
     bool pb_decode_from_bytes(const uint8_t* srcbuf, size_t srcbufsize, const pb_msgdesc_t* fields, void* dest_struct);                                                                  // decode the protobuf message from bytes

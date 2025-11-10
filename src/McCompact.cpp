@@ -1,8 +1,8 @@
-#include "MeshcoreCompact.hpp"
+#include "McCompact.hpp"
 
 #include "esp_log.h"
 #include "esp_mac.h"
-#define TAG "MeshcoreCompact"
+#define TAG "McCompact"
 
 volatile bool packetFlag = false;
 
@@ -12,10 +12,10 @@ void IRAM_ATTR onPacketReceived() {
     packetFlag = true;
 }
 
-MeshcoreCompact::MeshcoreCompact() {
+McCompact::McCompact() {
 }
 
-MeshcoreCompact::~MeshcoreCompact() {
+McCompact::~McCompact() {
     need_run = false;  // Stop the tasks
     packetFlag = true;
     // out_queue.stop_wait();                 // Notify any waiting pop() to unblock immediately
@@ -32,7 +32,7 @@ MeshcoreCompact::~MeshcoreCompact() {
     }
 }
 
-bool MeshcoreCompact::setRadioFrequency(float freq) {
+bool McCompact::setRadioFrequency(float freq) {
     if (radio == nullptr) {
         return false;
     }
@@ -43,7 +43,7 @@ bool MeshcoreCompact::setRadioFrequency(float freq) {
     }
     return (state == RADIOLIB_ERR_NONE);
 }
-bool MeshcoreCompact::setRadioSpreadingFactor(uint8_t sf) {
+bool McCompact::setRadioSpreadingFactor(uint8_t sf) {
     if (radio == nullptr) {
         return false;
     }
@@ -67,7 +67,7 @@ bool MeshcoreCompact::setRadioSpreadingFactor(uint8_t sf) {
     }
 }
 
-bool MeshcoreCompact::setRadioBandwidth(uint32_t bw) {
+bool McCompact::setRadioBandwidth(uint32_t bw) {
     if (radio == nullptr) {
         return false;
     }
@@ -90,7 +90,7 @@ bool MeshcoreCompact::setRadioBandwidth(uint32_t bw) {
         return (state == RADIOLIB_ERR_NONE);
     }
 }
-bool MeshcoreCompact::setRadioCodingRate(uint8_t cr) {
+bool McCompact::setRadioCodingRate(uint8_t cr) {
     if (radio == nullptr) {
         return false;
     }
@@ -113,7 +113,7 @@ bool MeshcoreCompact::setRadioCodingRate(uint8_t cr) {
         return (state == RADIOLIB_ERR_NONE);
     }
 }
-bool MeshcoreCompact::setRadioPower(int8_t power) {
+bool McCompact::setRadioPower(int8_t power) {
     if (radio == nullptr) {
         return false;
     }
@@ -125,7 +125,7 @@ bool MeshcoreCompact::setRadioPower(int8_t power) {
     return (state == RADIOLIB_ERR_NONE);
 }
 
-bool MeshcoreCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConfig& lora_config) {
+bool McCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConfig& lora_config) {
     this->radio_type = radio_type;
     ESP_LOGI(TAG, "RadioInit");
     hal = new EspHal(radio_pins.sck, radio_pins.miso, radio_pins.mosi, radio_pins.cs);
@@ -214,8 +214,8 @@ bool MeshcoreCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, Lo
     return true;
 }
 
-void MeshcoreCompact::task_send(void* pvParameters) {
-    MeshcoreCompact* mshcomp = static_cast<MeshcoreCompact*>(pvParameters);
+void McCompact::task_send(void* pvParameters) {
+    McCompact* mshcomp = static_cast<McCompact*>(pvParameters);
     ESP_LOGI(pcTaskGetName(NULL), "Start");
     while (mshcomp->need_run) {
         /* MCT_OutQueueEntry entry = mshcomp->out_queue.pop();
@@ -321,8 +321,8 @@ void MeshcoreCompact::task_send(void* pvParameters) {
     vTaskDelete(NULL);
 }
 
-void MeshcoreCompact::task_listen(void* pvParameters) {
-    MeshcoreCompact* mshcomp = static_cast<MeshcoreCompact*>(pvParameters);
+void McCompact::task_listen(void* pvParameters) {
+    McCompact* mshcomp = static_cast<McCompact*>(pvParameters);
     ESP_LOGI(pcTaskGetName(NULL), "Start");
     uint8_t rxData[256];  // Maximum Payload size of SX1261/62/68 is 255
     mshcomp->radio->startReceive();
@@ -369,18 +369,18 @@ void MeshcoreCompact::task_listen(void* pvParameters) {
     vTaskDelete(NULL);
 }
 
-bool MeshcoreCompact::RadioListen() {
+bool McCompact::RadioListen() {
     xTaskCreate(&task_listen, "RadioListen", 1024 * 4, this, 5, NULL);
     return true;
 }
 
-bool MeshcoreCompact::RadioSendInit() {
+bool McCompact::RadioSendInit() {
     // Start the send task
     xTaskCreate(&task_send, "RadioSend", 1024 * 4, this, 5, NULL);
     return true;
 }
 
-void MeshcoreCompact::intOnNodeInfo(MCC_Nodeinfo& nodeinfo) {
+void McCompact::intOnNodeInfo(MCC_Nodeinfo& nodeinfo) {
     nodeinfo_db.addOrUpdate(nodeinfo);
     if (onNodeInfo) {
         onNodeInfo(nodeinfo);
@@ -394,7 +394,7 @@ void MeshcoreCompact::intOnNodeInfo(MCC_Nodeinfo& nodeinfo) {
     }
 }
 
-int16_t MeshcoreCompact::ProcessPacket(uint8_t* data, int len, MeshcoreCompact* mshcomp) {
+int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
     MCC_Header header;
     size_t pos = header.parse(data, len);
     if (pos == 0) {
@@ -478,17 +478,17 @@ int16_t MeshcoreCompact::ProcessPacket(uint8_t* data, int len, MeshcoreCompact* 
             return 1;
             /*
             Received packet of length 38: 09 00 48 AC A0 13 C8 09 C2 36 BF F6 CC 78 B2 35 18 37 75 7D FC 9B 61 F2 0E 41 15 20 4B 52 C0 B2 55 DF 8A 8B E7 65
-I (86779) MeshcoreCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
-I (86799) MeshcoreCompact: Path:
-I (86799) MeshcoreCompact: TXT_MSG packet: timestamp=918686152, flags=0xbf, msg_len=27, msg=��x�57u}��a�A KR��Uߊ��e
+I (86779) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
+I (86799) McCompact: Path:
+I (86799) McCompact: TXT_MSG packet: timestamp=918686152, flags=0xbf, msg_len=27, msg=��x�57u}��a�A KR��Uߊ��e
 Received packet of length 38: 09 00 48 AC 0D 5B 7D C7 81 BF CF 6E 4A 32 00 B8 6A 3E DE E9 F5 B2 61 F2 0E 41 15 20 4B 52 C0 B2 55 DF 8A 8B E7 65
-I (96189) MeshcoreCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
-I (96209) MeshcoreCompact: Path:
-I (96209) MeshcoreCompact: TXT_MSG packet: timestamp=3212953469, flags=0xcf, msg_len=27, msg=nJ2
+I (96189) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
+I (96209) McCompact: Path:
+I (96209) McCompact: TXT_MSG packet: timestamp=3212953469, flags=0xcf, msg_len=27, msg=nJ2
 Received packet of length 38: 09 00 48 AC EC D0 0E 15 8C 29 CC 1F AE C7 C8 58 83 A3 CF 5E 39 0F 61 F2 0E 41 15 20 4B 52 C0 B2 55 DF 8A 8B E7 65
-I (105999) MeshcoreCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
-I (106019) MeshcoreCompact: Path:
-I (106019) MeshcoreCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg_len=27, msg=���X���^9a�A KR��Uߊ��e
+I (105999) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
+I (106019) McCompact: Path:
+I (106019) McCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg_len=27, msg=���X���^9a�A KR��Uߊ��e
 */
         }
     }
@@ -519,7 +519,7 @@ I (106019) MeshcoreCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg
     return 0;
 }
 
-int MeshcoreCompact::decrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
+int McCompact::decrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
     mbedtls_aes_context aes_ctx;
     uint8_t* dp = dest;
     const uint8_t* sp = src;
@@ -545,7 +545,7 @@ int MeshcoreCompact::decrypt(const uint8_t* shared_secret, uint8_t* dest, const 
     // Return the total number of bytes processed
     return sp - src;
 };
-int MeshcoreCompact::encrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
+int McCompact::encrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
     mbedtls_aes_context aes_ctx;
     uint8_t* dp = dest;
     const uint8_t* sp = src;
@@ -588,7 +588,7 @@ int MeshcoreCompact::encrypt(const uint8_t* shared_secret, uint8_t* dest, const 
     // Return the total number of bytes written to the destination
     return dp - dest;
 };
-int MeshcoreCompact::encryptThenMAC(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
+int McCompact::encryptThenMAC(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
     int enc_len = encrypt(shared_secret, dest + CIPHER_MAC_SIZE, src, src_len);
     const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
     // This single function performs the reset, update, and finalize steps.
@@ -602,7 +602,7 @@ int MeshcoreCompact::encryptThenMAC(const uint8_t* shared_secret, uint8_t* dest,
     );
     return 0;
 };
-int MeshcoreCompact::MACThenDecrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
+int McCompact::MACThenDecrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
     if (src_len <= CIPHER_MAC_SIZE) {
         return 0;  // Invalid source length
     }
@@ -637,7 +637,7 @@ int MeshcoreCompact::MACThenDecrypt(const uint8_t* shared_secret, uint8_t* dest,
     return 0;
 };
 
-int MeshcoreCompact::secure_memcmp(const void* a, const void* b, size_t size) {
+int McCompact::secure_memcmp(const void* a, const void* b, size_t size) {
     const unsigned char* a_ptr = (const unsigned char*)a;
     const unsigned char* b_ptr = (const unsigned char*)b;
     unsigned int result = 0;
