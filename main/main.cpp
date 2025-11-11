@@ -42,6 +42,7 @@ extern "C" void app_main(void) {
     mesh.setSendEnabled(true);
     mesh.setSendHopLimit(7);
     mesh.setPrimaryChanHash(31);
+    mesh.setAutoFullNode(false);
     // priv:
     //  f0, 69, 3d, fd, 3e, 2c, 68, cb, b3, cc, 09, e6, db, 6c, e0, 6a, f7, ea, 33, aa, 3c, df, de, af, d3, aa, e5, 0c, 22, ba, 0b, 74,
     // pub:
@@ -58,13 +59,13 @@ extern "C" void app_main(void) {
     mesh.sendMyNodeInfo();
     vTaskDelay(pdMS_TO_TICKS(10000));
     // ESP_LOGI("Main", "Sending nodeinfo...");
-    //  mesh.sendMyNodeInfo(0x433ad734, true);
+    //  mesh.sendMyNodeInfo(0xa0cc18fc, true);
     vTaskDelay(pdMS_TO_TICKS(20000));
     std::string test_msg = "Hello from EspMeshtasticCompact!";
     ESP_LOGI("Main", "Sending test message");
-    mesh.sendTextMessage(test_msg, 0x433ad734, 0);
+    mesh.sendTextMessage(test_msg, 0xa0cc18fc, 0);
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(60000));
-        mesh.sendTextMessage(test_msg, 0x433ad734, 0);
+        mesh.sendTextMessage(test_msg, 0xa0cc18fc, 0);
     }
 }

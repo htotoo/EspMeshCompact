@@ -320,7 +320,6 @@ void MtCompact::task_send(void* pvParameters) {
                 mshcomp->encryptCurve25519(entry.header.dstnode, entry.header.srcnode, dstpub, entry.header.packet_id, payload_len, payload, encrypted_payload);
                 payload_len += 12;  // Curve25519 adds 16 bytes overhead
                 ESP_LOGI("SEND", "Curve25519 encrypt to node 0x%08" PRIx32, entry.header.dstnode);
-                continue;
             } else {
                 if (mshcomp->aes_decrypt_meshtastic_payload(entry.key, entry.key_len * 8, entry.header.packet_id, entry.header.srcnode, payload, encrypted_payload, payload_len)) {
                     ESP_LOGI("SEND", "AES encrypt to node 0x%08" PRIx32, entry.header.dstnode);
@@ -1287,6 +1286,7 @@ bool MtCompact::encryptCurve25519(uint32_t toNode, uint32_t fromNode, uint8_t* r
     }
     hash(shared_key, 32);
     initNonce(fromNode, packetNum, extraNonceTmp);
+    ESP_LOGI("MT_CRYPTO", "Encrypting with Curve25519  packet %llu extraNonce %ld", packetNum, extraNonceTmp);
     // Calculate the shared secret with the destination node and encrypt
     aes_ccm_ae(shared_key, 32, nonce, 8, bytes, numBytes, nullptr, 0, bytesOut, auth, aes);  // this can write up to 15 bytes longer than numbytes past bytesOut
     memcpy((uint8_t*)(auth + 8), &extraNonceTmp, sizeof(uint32_t));                          // do not use dereference on potential non aligned pointers : *extraNonce = extraNonceTmp;
