@@ -59,13 +59,13 @@ extern "C" void app_main(void) {
     mesh.sendMyNodeInfo();
     vTaskDelay(pdMS_TO_TICKS(10000));
     // ESP_LOGI("Main", "Sending nodeinfo...");
-    //  mesh.sendMyNodeInfo(0xa0cc18fc, true);
+    mesh.sendMyNodeInfo(0xb29facf4, true);
     vTaskDelay(pdMS_TO_TICKS(20000));
     std::string test_msg = "Hello from EspMeshtasticCompact!";
     ESP_LOGI("Main", "Sending test message");
-    mesh.sendTextMessage(test_msg, 0xa0cc18fc, 0);
+    // mesh.sendTextMessage(test_msg, 0x0xb29facf4, 0);
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(60000));
-        mesh.sendTextMessage(test_msg, 0xa0cc18fc, 0);
+        mesh.sendTextMessage(test_msg, 0xb29facf4, 0, MCT_MESSAGE_TYPE_ALERT, 0);
     }
 }

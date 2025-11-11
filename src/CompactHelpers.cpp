@@ -47,3 +47,10 @@ void CompactHelpers::sha256(uint8_t* hash, size_t hash_len, const uint8_t* frag1
     memcpy(hash, full_hash, hash_len);
     mbedtls_sha256_free(&sha256);
 };
+
+uint8_t CompactHelpers::xorHash(const uint8_t* data, size_t len) {
+    uint8_t code = 0;
+    for (size_t i = 0; i < len; i++)
+        code ^= data[i];
+    return code;
+}

@@ -732,7 +732,7 @@ int16_t MtCompact::processPacket(uint8_t* data, int len, MtCompact* mshcomp) {
             } else if (decodedtmp.portnum == 10) {
                 ESP_LOGI(TAG, "Received a detection sensor packet");
                 // payload: utf8 text
-                MCT_TextMessage msg = {std::string(reinterpret_cast<const char*>(decodedtmp.payload.bytes), decodedtmp.payload.size), (uint8_t)ret, MCT_MESSAGE_TYPE_DETECTOR_SENSOR};
+                MCT_TextMessage msg = {std::string(reinterpret_cast<const char*>(decodedtmp.payload.bytes), decodedtmp.payload.size), (uint8_t)ret, MCT_MESSAGE_TYPE_DETECTION_SENSOR};
                 intOnMessage(header, msg);
             } else if (decodedtmp.portnum == 11) {
                 ESP_LOGI(TAG, "Received an alert packet");
@@ -895,6 +895,7 @@ int16_t MtCompact::try_decode_root_packet(const uint8_t* srcbuf, size_t srcbufsi
     if (aes_decrypt_meshtastic_payload(default_l1_key, sizeof(default_l1_key) * 8, header.packet_id, header.srcnode, srcbuf, decrypted_data, srcbufsize)) {
         if (pb_decode_from_bytes(decrypted_data, srcbufsize, fields, dest_struct)) return 254;
     }
+    // todo call chanmgr to decode it
     memset(dest_struct, 0, dest_struct_size);
     if (aes_decrypt_meshtastic_payload(default_chan_key, sizeof(default_chan_key) * 8, header.packet_id, header.srcnode, srcbuf, decrypted_data, srcbufsize)) {
         if (pb_decode_from_bytes(decrypted_data, srcbufsize, fields, dest_struct)) return 0;
@@ -1065,11 +1066,23 @@ void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint1
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
     entry.header.chan_hash = chan >= 256 ? pri_chan_hash : (uint8_t)chan;
+    if (dstnode != 0xffffffff) entry.header.chan_hash = 0;  // Use 0 for private msgs
     entry.header.via_mqtt = 0;
     entry.encType = 0;
     entry.data.payload.size = text.size();
     memcpy(entry.data.payload.bytes, text.data(), text.size());
     entry.data.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;  // NodeInfo portnum
+    if (type == MCT_MESSAGE_TYPE_ALERT) {
+        entry.data.portnum = meshtastic_PortNum_ALERT_APP;
+    } else if (type == MCT_MESSAGE_TYPE_PING) {
+        entry.data.portnum = meshtastic_PortNum_REPLY_APP;
+    } else if (type == MCT_MESSAGE_TYPE_UART) {
+        entry.data.portnum = meshtastic_PortNum_SERIAL_APP;
+    } else if (type == MCT_MESSAGE_TYPE_RANGE_TEST) {
+        entry.data.portnum = meshtastic_PortNum_RANGE_TEST_APP;
+    } else if (type == MCT_MESSAGE_TYPE_DETECTION_SENSOR) {
+        entry.data.portnum = meshtastic_PortNum_DETECTION_SENSOR_APP;
+    }
     entry.data.want_response = 0;
     entry.data.bitfield = 0;
     if (ok_to_mqtt) entry.data.bitfield |= 1 << BITFIELD_OK_TO_MQTT_SHIFT;  // Set the MQTT upload bit

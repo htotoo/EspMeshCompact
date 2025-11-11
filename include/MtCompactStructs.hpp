@@ -1,18 +1,18 @@
-#ifndef MeshtasticCompactStructs_h
-#define MeshtasticCompactStructs_h
+#pragma once
 
 #include <stdint.h>
 #include "meshtastic/mesh.pb.h"
 #include <string>
 #include "RadioStructs.hpp"
+#include "CompactHelpers.hpp"
 
 typedef enum {
-    MCT_MESSAGE_TYPE_TEXT = 0,             // Normal text message
-    MCT_MESSAGE_TYPE_ALERT = 1,            // Alert message
-    MCT_MESSAGE_TYPE_DETECTOR_SENSOR = 2,  // Detector sensor message
-    MCT_MESSAGE_TYPE_PING = 3,             // Ping message
-    MCT_MESSAGE_TYPE_UART = 4,             // UART message
-    MCT_MESSAGE_TYPE_RANGE_TEST = 5,       // Range test message
+    MCT_MESSAGE_TYPE_TEXT = 0,              // Normal text message
+    MCT_MESSAGE_TYPE_ALERT = 1,             // Alert message
+    MCT_MESSAGE_TYPE_DETECTION_SENSOR = 2,  // Detector sensor message
+    MCT_MESSAGE_TYPE_PING = 3,              // Ping message
+    MCT_MESSAGE_TYPE_UART = 4,              // UART message
+    MCT_MESSAGE_TYPE_RANGE_TEST = 5,        // Range test message
 } MCT_MESSAGE_TYPE;
 
 struct MCT_Header {
@@ -125,4 +125,23 @@ struct MCT_RouteDiscovery {
     int8_t snr_back[8];
 };
 
-#endif  // MeshtasticCompactStructs_h
+class MTC_ChannelEntry {
+   public:
+    MTC_ChannelEntry() {};
+    MTC_ChannelEntry(std::string n, uint8_t s[32]) : name(n) {
+        memcpy(secret, s, 32);
+        calcHash();
+    };
+    bool operator==(const MTC_ChannelEntry& other) const {
+        return name == other.name;
+    }
+
+    void calcHash() {
+        hash[0] = CompactHelpers::xorHash((const uint8_t*)name.c_str(), name.length());
+        hash[0] ^= CompactHelpers::xorHash(secret, 32);
+    }
+
+    std::string name;
+    uint8_t secret[32];
+    uint8_t hash[1];
+};
