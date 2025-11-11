@@ -981,7 +981,7 @@ void MtCompact::sendTracerouteReply(MCT_Header& header, MCT_RouteDiscovery& rout
     out_queue.push(entry);
 }
 
-void MtCompact::sendTraceroute(uint32_t dest_node_id, uint8_t chan, uint32_t sender_node_id) {
+void MtCompact::sendTraceroute(uint32_t dest_node_id, uint16_t chan, uint32_t sender_node_id) {
     if (!is_send_enabled) return;
     if (is_in_stealth_mode) return;
 
@@ -993,7 +993,7 @@ void MtCompact::sendTraceroute(uint32_t dest_node_id, uint8_t chan, uint32_t sen
     entry.header.want_ack = 1;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = chan == 255 ? pri_chan_hash : chan;
+    entry.header.chan_hash = chan >= 256 ? pri_chan_hash : (uint8_t)chan;
     entry.header.via_mqtt = 0;
     entry.encType = 1;
     meshtastic_RouteDiscovery route_discovery_msg = meshtastic_RouteDiscovery_init_default;
@@ -1054,7 +1054,7 @@ void MtCompact::sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode, bool exch
     out_queue.push(entry);
 }
 
-void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint8_t chan, MCT_MESSAGE_TYPE type, uint32_t sender_node_id) {
+void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint16_t chan, MCT_MESSAGE_TYPE type, uint32_t sender_node_id) {
     if (!is_send_enabled) return;
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dstnode;
@@ -1064,7 +1064,7 @@ void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint8
     entry.header.want_ack = 1;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = chan == 255 ? pri_chan_hash : chan;
+    entry.header.chan_hash = chan >= 256 ? pri_chan_hash : (uint8_t)chan;
     entry.header.via_mqtt = 0;
     entry.encType = 0;
     entry.data.payload.size = text.size();
@@ -1079,7 +1079,7 @@ void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint8
     out_queue.push(entry);
 }
 
-void MtCompact::sendRequestPositionInfo(uint32_t dest_node_id, uint8_t chan, uint32_t sender_node_id) {
+void MtCompact::sendRequestPositionInfo(uint32_t dest_node_id, uint16_t chan, uint32_t sender_node_id) {
     if (!is_send_enabled) return;  // todo check if this works or deletes the position
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dest_node_id;
@@ -1089,7 +1089,7 @@ void MtCompact::sendRequestPositionInfo(uint32_t dest_node_id, uint8_t chan, uin
     entry.header.want_ack = 0;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = chan == 255 ? pri_chan_hash : chan;
+    entry.header.chan_hash = chan >= 256 ? pri_chan_hash : (uint8_t)chan;
     entry.header.via_mqtt = 0;
     entry.encType = 1;
     entry.data.portnum = meshtastic_PortNum_POSITION_APP;
@@ -1104,7 +1104,7 @@ void MtCompact::sendRequestPositionInfo(uint32_t dest_node_id, uint8_t chan, uin
     out_queue.push(entry);
 }
 
-void MtCompact::sendPositionMessage(MCT_Position& position, uint32_t dstnode, uint8_t chan, uint32_t sender_node_id) {
+void MtCompact::sendPositionMessage(MCT_Position& position, uint32_t dstnode, uint16_t chan, uint32_t sender_node_id) {
     if (!is_send_enabled) return;
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dstnode;
@@ -1114,7 +1114,7 @@ void MtCompact::sendPositionMessage(MCT_Position& position, uint32_t dstnode, ui
     entry.header.want_ack = 0;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = chan == 255 ? pri_chan_hash : chan;
+    entry.header.chan_hash = chan >= 256 ? pri_chan_hash : (uint8_t)chan;
     entry.header.via_mqtt = 0;
     entry.encType = 1;
     entry.data.portnum = meshtastic_PortNum_POSITION_APP;
@@ -1142,7 +1142,7 @@ void MtCompact::sendPositionMessage(MCT_Position& position, uint32_t dstnode, ui
     out_queue.push(entry);
 }
 
-void MtCompact::sendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode, uint8_t chan, uint32_t sender_node_id) {
+void MtCompact::sendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode, uint16_t chan, uint32_t sender_node_id) {
     if (!is_send_enabled) return;
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dstnode;
@@ -1152,7 +1152,7 @@ void MtCompact::sendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode, ui
     entry.header.want_ack = 0;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = chan == 255 ? pri_chan_hash : chan;
+    entry.header.chan_hash = chan >= 256 ? pri_chan_hash : (uint8_t)chan;
     entry.header.via_mqtt = 0;
     entry.encType = 1;  // AES encryption
     entry.data.portnum = meshtastic_PortNum_WAYPOINT_APP;
@@ -1175,7 +1175,7 @@ void MtCompact::sendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode, ui
     out_queue.push(entry);
 }
 
-void MtCompact::sendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t dstnode, uint8_t chan, uint32_t sender_node_id) {
+void MtCompact::sendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t dstnode, uint16_t chan, uint32_t sender_node_id) {
     if (!is_send_enabled) return;
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dstnode;
@@ -1185,7 +1185,7 @@ void MtCompact::sendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t ds
     entry.header.want_ack = 0;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = chan == 255 ? pri_chan_hash : chan;
+    entry.header.chan_hash = chan >= 256 ? pri_chan_hash : (uint8_t)chan;
     entry.header.via_mqtt = 0;
     entry.encType = 1;
     entry.data.portnum = meshtastic_PortNum_TELEMETRY_APP;
@@ -1211,7 +1211,7 @@ void MtCompact::sendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t ds
     out_queue.push(entry);
 }
 
-void MtCompact::sendTelemetryEnvironment(MCT_Telemetry_Environment& telemetry, uint32_t dstnode, uint8_t chan, uint32_t sender_node_id) {
+void MtCompact::sendTelemetryEnvironment(MCT_Telemetry_Environment& telemetry, uint32_t dstnode, uint16_t chan, uint32_t sender_node_id) {
     if (!is_send_enabled) return;
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dstnode;
@@ -1221,7 +1221,7 @@ void MtCompact::sendTelemetryEnvironment(MCT_Telemetry_Environment& telemetry, u
     entry.header.want_ack = 0;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = chan == 255 ? pri_chan_hash : chan;
+    entry.header.chan_hash = chan >= 256 ? pri_chan_hash : (uint8_t)chan;
     entry.header.via_mqtt = 0;
     entry.encType = 1;
     entry.data.portnum = meshtastic_PortNum_TELEMETRY_APP;

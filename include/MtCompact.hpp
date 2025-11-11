@@ -123,17 +123,17 @@ class MtCompact {
     void sendMyNodeInfo(uint32_t dstnode = 0xffffffff, bool exchange = false) {
         sendNodeInfo(my_nodeinfo, dstnode, exchange);
     }
-    void sendTextMessage(const std::string& text, uint32_t dstnode = 0xffffffff, uint8_t chan = 0, MCT_MESSAGE_TYPE type = MCT_MESSAGE_TYPE_TEXT, uint32_t sender_node_id = 0);
-    void sendPositionMessage(MCT_Position& position, uint32_t dstnode = 0xffffffff, uint8_t chan = 0, uint32_t sender_node_id = 0);
-    void sendMyPosition(uint32_t dstnode = 0xffffffff, uint8_t chan = 0) {
+    void sendTextMessage(const std::string& text, uint32_t dstnode = 0xffffffff, uint16_t chan = 256, MCT_MESSAGE_TYPE type = MCT_MESSAGE_TYPE_TEXT, uint32_t sender_node_id = 0);
+    void sendPositionMessage(MCT_Position& position, uint32_t dstnode = 0xffffffff, uint16_t chan = 256, uint32_t sender_node_id = 0);
+    void sendMyPosition(uint32_t dstnode = 0xffffffff, uint16_t chan = 256) {
         sendPositionMessage(my_position, dstnode, chan);
     }
-    void sendRequestPositionInfo(uint32_t dest_node_id, uint8_t chan = 0, uint32_t sender_node_id = 0);
-    void sendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode = 0xffffffff, uint8_t chan = 0, uint32_t sender_node_id = 0);
-    void sendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t dstnode = 0xffffffff, uint8_t chan = 0, uint32_t sender_node_id = 0);
-    void sendTelemetryEnvironment(MCT_Telemetry_Environment& telemetry, uint32_t dstnode = 0xffffffff, uint8_t chan = 0, uint32_t sender_node_id = 0);
+    void sendRequestPositionInfo(uint32_t dest_node_id, uint16_t chan = 256, uint32_t sender_node_id = 0);
+    void sendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode = 0xffffffff, uint16_t chan = 256, uint32_t sender_node_id = 0);
+    void sendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t dstnode = 0xffffffff, uint16_t chan = 256, uint32_t sender_node_id = 0);
+    void sendTelemetryEnvironment(MCT_Telemetry_Environment& telemetry, uint32_t dstnode = 0xffffffff, uint16_t chan = 256, uint32_t sender_node_id = 0);
     void sendTracerouteReply(MCT_Header& header, MCT_RouteDiscovery& route_discovery);
-    void sendTraceroute(uint32_t dest_node_id, uint8_t chan = 0, uint32_t sender_node_id = 0);
+    void sendTraceroute(uint32_t dest_node_id, uint16_t chan = 256, uint32_t sender_node_id = 0);
 
     void setPrimaryChanHash(uint8_t chan_hash) { pri_chan_hash = chan_hash; }
 
