@@ -22,9 +22,8 @@
 #include "MtCompactOutQueue.hpp"
 #include "MtCompactFileIO.hpp"
 #include "MtCompactHelpers.hpp"
+#include "MtCompactChanMgr.hpp"
 #include "AES.h"
-
-// https://github.com/meshtastic/firmware/blob/81828c6244daede254cf759a0f2bd939b2e7dd65/variants/heltec_wsl_v3/variant.h
 
 class MtCompact {
    public:
@@ -166,6 +165,7 @@ class MtCompact {
     NodeInfoDB nodeinfo_db;    // NodeInfo database.
     MtCompactRouter router;    // Router for message deduplication. Set MyId if you changed that. Also you can disable exclude self option
     MCT_Position my_position;  // My position, used for auto replies (when enabled) on position requests. Or when you call sendMyPosition()
+    MtCompatChanMgr chan_mgr;  // Channel manager for handling multiple channels
    private:
     RadioType radio_type;
     bool radioListen();    // inits the listening thread for the radio
@@ -216,11 +216,6 @@ class MtCompact {
     const uint8_t default_l1_key[16] =
         {0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59,
          0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01};  // default aes128 key for L1 encryption
-    const uint8_t default_chan_key[32] = {
-        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};  // default channel key
 
     uint8_t pri_chan_hash = 8;  // for longfast
 

@@ -7,8 +7,11 @@
 
 class MtCompatChanMgr {
    public:
-    void addChannel(std::string& name, uint8_t secret[32]) {
-        MTC_ChannelEntry entry(name, secret);
+    void addDefaultChannels();
+    void addDefaultEncryption(std::string name);
+
+    void addChannel(std::string name, uint8_t* secret, size_t secret_len = 32) {
+        MTC_ChannelEntry entry(name, secret, secret_len);
         for (const auto& ch : channels) {
             if (ch == entry) {
                 return;  // Channel already exists

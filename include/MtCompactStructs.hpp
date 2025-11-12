@@ -128,8 +128,8 @@ struct MCT_RouteDiscovery {
 class MTC_ChannelEntry {
    public:
     MTC_ChannelEntry() {};
-    MTC_ChannelEntry(std::string n, uint8_t s[32]) : name(n) {
-        memcpy(secret, s, 32);
+    MTC_ChannelEntry(std::string n, uint8_t s[32], size_t len) : name(n), secret_len(len) {
+        memcpy(secret, s, len);
         calcHash();
     };
     bool operator==(const MTC_ChannelEntry& other) const {
@@ -138,10 +138,11 @@ class MTC_ChannelEntry {
 
     void calcHash() {
         hash[0] = CompactHelpers::xorHash((const uint8_t*)name.c_str(), name.length());
-        hash[0] ^= CompactHelpers::xorHash(secret, 32);
+        hash[0] ^= CompactHelpers::xorHash(secret, secret_len);
     }
 
     std::string name;
     uint8_t secret[32];
+    size_t secret_len;
     uint8_t hash[1];
 };

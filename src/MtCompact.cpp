@@ -894,10 +894,6 @@ int16_t MtCompact::try_decode_root_packet(const uint8_t* srcbuf, size_t srcbufsi
         if (pb_decode_from_bytes(decrypted_data, srcbufsize, fields, dest_struct)) return 254;
     }
     // todo call chanmgr to decode it
-    memset(dest_struct, 0, dest_struct_size);
-    if (aes_decrypt_meshtastic_payload(default_chan_key, sizeof(default_chan_key) * 8, header.packet_id, header.srcnode, srcbuf, decrypted_data, srcbufsize)) {
-        if (pb_decode_from_bytes(decrypted_data, srcbufsize, fields, dest_struct)) return 0;
-    }
 
     if (header.chan_hash == 0 && header.dstnode != 0xffffffff) {
         // todo pki decrypt
