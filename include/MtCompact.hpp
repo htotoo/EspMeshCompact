@@ -181,6 +181,7 @@ class MtCompact {
 
     // crypto
     bool encryptCurve25519(uint32_t toNode, uint32_t fromNode, uint8_t* remotePublic, uint64_t packetNum, size_t numBytes, const uint8_t* bytes, uint8_t* bytesOut);
+    bool decryptCurve25519(uint32_t fromNode, uint8_t* remotePublic, uint64_t packetNum, size_t numBytes, const uint8_t* bytes, uint8_t* bytesOut);
     bool setDHPublicKey(uint8_t* pubKey);
     void hash(uint8_t* bytes, size_t numBytes);
     void initNonce(uint32_t fromNode, uint64_t packetId, uint32_t extraNonce);

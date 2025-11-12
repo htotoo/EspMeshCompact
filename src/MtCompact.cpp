@@ -893,15 +893,30 @@ int16_t MtCompact::try_decode_root_packet(const uint8_t* srcbuf, size_t srcbufsi
     if (aes_decrypt_meshtastic_payload(default_l1_key, sizeof(default_l1_key) * 8, header.packet_id, header.srcnode, srcbuf, decrypted_data, srcbufsize)) {
         if (pb_decode_from_bytes(decrypted_data, srcbufsize, fields, dest_struct)) return 254;
     }
-    // todo call chanmgr to decode it
+    // call chanmgr to decode it if it is not private
+    if (header.dstnode == 0xffffffff) {
+        for (auto& chan : chan_mgr.channels) {
+            if (chan.hash[0] == header.chan_hash) {
+                if (aes_decrypt_meshtastic_payload(chan.secret, chan.secret_len * 8, header.packet_id, header.srcnode, srcbuf, decrypted_data, srcbufsize)) {
+                    if (pb_decode_from_bytes(decrypted_data, srcbufsize, fields, dest_struct)) return header.chan_hash;
+                }
+            }
+        }
+    }
 
     if (header.chan_hash == 0 && header.dstnode != 0xffffffff) {
-        // todo pki decrypt
-        ESP_LOGI(TAG, "can't decode priv packet");
+        auto nodeinfo = nodeinfo_db.get(header.srcnode);
+        if (nodeinfo != nullptr) {
+            bool ret = decryptCurve25519(header.srcnode, nodeinfo->public_key, header.packet_id, srcbufsize, srcbuf, decrypted_data);
+            if (ret) {
+                if (pb_decode_from_bytes(decrypted_data, srcbufsize - 12, fields, dest_struct)) {
+                    return 0;
+                }
+            }
+        }
+
         return -1;
     }
-    // todo iterate chan keys
-
     ESP_LOGI(TAG, "can't decode packet");
     return -1;
 }
@@ -1298,6 +1313,19 @@ bool MtCompact::encryptCurve25519(uint32_t toNode, uint32_t fromNode, uint8_t* r
     aes_ccm_ae(shared_key, 32, nonce, 8, bytes, numBytes, nullptr, 0, bytesOut, auth, aes);  // this can write up to 15 bytes longer than numbytes past bytesOut
     memcpy((uint8_t*)(auth + 8), &extraNonceTmp, sizeof(uint32_t));                          // do not use dereference on potential non aligned pointers : *extraNonce = extraNonceTmp;
     return true;
+}
+
+bool MtCompact::decryptCurve25519(uint32_t fromNode, uint8_t* remotePublic, uint64_t packetNum, size_t numBytes, const uint8_t* bytes, uint8_t* bytesOut) {
+    const uint8_t* auth = bytes + numBytes - 12;
+    uint32_t extraNonce;
+    memcpy(&extraNonce, auth + 8, sizeof(uint32_t));
+    // Calculate the shared secret with the sending node and decrypt
+    if (!setDHPublicKey(remotePublic)) {
+        return false;
+    }
+    hash(shared_key, 32);
+    initNonce(fromNode, packetNum, extraNonce);
+    return aes_ccm_ad(shared_key, 32, nonce, 8, bytes, numBytes - 12, nullptr, 0, auth, bytesOut, aes);
 }
 
 bool MtCompact::setDHPublicKey(uint8_t* pubKey) {
