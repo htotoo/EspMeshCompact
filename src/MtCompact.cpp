@@ -945,6 +945,9 @@ void MtCompact::send_ack(MCT_Header& header) {
     meshtastic_Routing c = meshtastic_Routing_init_default;
     c.error_reason = meshtastic_Routing_Error_NONE;  // No error reason for ACK
     c.which_variant = meshtastic_Routing_error_reason_tag;
+    entry.data.bitfield = 0;
+    if (ok_to_mqtt) entry.data.bitfield |= 1 << BITFIELD_OK_TO_MQTT_SHIFT;  // Set the MQTT upload bit
+    entry.data.has_bitfield = true;
     entry.data.payload.size = pb_encode_to_bytes(entry.data.payload.bytes, sizeof(entry.data.payload.bytes), &meshtastic_Routing_msg, &c);
     out_queue.push(entry);
 }
