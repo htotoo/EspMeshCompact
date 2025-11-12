@@ -152,7 +152,7 @@ bool McCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConf
             state = ((SX1276*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, 5);
             break;
         default:
-            ESP_LOGE(TAG, "Unsupported radio type, let's try: SX1262");
+            ESP_LOGW(TAG, "Unsupported radio type, let's try: SX1262");
             radio = new SX1262(new Module(hal, radio_pins.cs, radio_pins.irq, radio_pins.rst, radio_pins.gpio));
             state = ((SX1262*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, lora_config.tcxo_voltage, lora_config.use_regulator_ldo);
             return false;
@@ -216,7 +216,6 @@ bool McCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConf
 
 void McCompact::task_send(void* pvParameters) {
     McCompact* mshcomp = static_cast<McCompact*>(pvParameters);
-    ESP_LOGI(pcTaskGetName(NULL), "Start");
     while (mshcomp->need_run) {
         /* MCT_OutQueueEntry entry = mshcomp->out_queue.pop();
 

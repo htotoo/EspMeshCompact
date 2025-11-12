@@ -245,7 +245,7 @@ class EspHal : public RadioLibHal {
 
         esp_err_t ret;
         ret = spi_bus_initialize(SPI2_HOST, &spi_bus_config, SPI_DMA_CH_AUTO);
-        ESP_LOGI("ESPHal", "spi_bus_initialize=%d", ret);
+        // ESP_LOGI("ESPHal", "spi_bus_initialize=%d", ret);
         if (ret != 259) assert(ret == ESP_OK);  // 259 = already inited
 
         spi_device_interface_config_t devcfg = {
@@ -257,7 +257,7 @@ class EspHal : public RadioLibHal {
             .pre_cb = NULL};
         // spi_device_handle_t handle;
         ret = spi_bus_add_device(SPI2_HOST, &devcfg, &SpiHandle);
-        ESP_LOGI("ESPHal", "spi_bus_add_device=%d", ret);
+        // ESP_LOGI("ESPHal", "spi_bus_add_device=%d", ret);
     }
 
     void spiBeginTransaction() {

@@ -42,7 +42,7 @@ extern "C" void app_main(void) {
     MtCompactHelpers::PositionBuilder(mesh.my_position, 47.497913, 19.040236, 120);
     mesh.setSendEnabled(true);
     mesh.setSendHopLimit(7);
-    mesh.setPrimaryChanHash(31);
+    mesh.setPrimaryChanByHash(31);
     mesh.setAutoFullNode(false);
     // priv:
     //  f0, 69, 3d, fd, 3e, 2c, 68, cb, b3, cc, 09, e6, db, 6c, e0, 6a, f7, ea, 33, aa, 3c, df, de, af, d3, aa, e5, 0c, 22, ba, 0b, 74,

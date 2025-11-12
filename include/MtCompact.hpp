@@ -60,6 +60,11 @@ class MtCompact {
     void setOnNativeTelemetryDevice(OnNativeTelemetryDeviceCallback cb) { onNativeTelemetryDevice = cb; }
     void setOnNativeTelemetryEnvironment(OnNativeTelemetryEnvironmentCallback cb) { onNativeTelemetryEnvironment = cb; }
 
+    // To enable or disable this module's logging to serial
+    void setDebugMode(bool enabled) {
+        debugmode = enabled;
+    }
+
     /**
      * @brief Get the Last Signal Strengh Data
      *
@@ -135,7 +140,7 @@ class MtCompact {
     void sendTracerouteReply(MCT_Header& header, MCT_RouteDiscovery& route_discovery);
     void sendTraceroute(uint32_t dest_node_id, uint16_t chan = 256, uint32_t sender_node_id = 0);
 
-    void setPrimaryChanHash(uint8_t chan_hash) { pri_chan_hash = chan_hash; }
+    void setPrimaryChanByHash(uint8_t chan_hash) { pri_chan_hash = chan_hash; }  // set what is the default channel. //todo replace with chanmgr function!
 
     // Radio settings on the fly
     bool setRadioFrequency(float freq);
@@ -227,6 +232,8 @@ class MtCompact {
     mbedtls_aes_context aes_ctx;
     mutable std::mutex mtx_radio;
     bool need_run = true;  // thread exit flag
+
+    bool debugmode = false;  // if true, enables debug logging
 
     MeshCompactOutQueue out_queue;  // Outgoing queue for packets to be sent.
 

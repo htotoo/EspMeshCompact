@@ -196,7 +196,7 @@ bool MtCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConf
             state = ((SX1276*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, 5);
             break;
         default:
-            ESP_LOGE(TAG, "Unsupported radio type, let's try: SX1262");
+            ESP_LOGW(TAG, "Unsupported radio type, let's try: SX1262");
             radio = new SX1262(new Module(hal, radio_pins.cs, radio_pins.irq, radio_pins.rst, radio_pins.gpio));
             state = ((SX1262*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, lora_config.tcxo_voltage, lora_config.use_regulator_ldo);
             return false;
@@ -260,7 +260,6 @@ bool MtCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConf
 
 void MtCompact::task_send(void* pvParameters) {
     MtCompact* mshcomp = static_cast<MtCompact*>(pvParameters);
-    ESP_LOGI(pcTaskGetName(NULL), "Start");
     while (mshcomp->need_run) {
         MCT_OutQueueEntry entry = mshcomp->out_queue.pop();
 
@@ -314,13 +313,12 @@ void MtCompact::task_send(void* pvParameters) {
                 aesenc = false;  // key
 
             if (!aesenc) {
-                // private message, encrypt with that method if pubkey is availeable //todo
+                // private message, encrypt with that method if pubkey is availeable
+                // todo length check for the +12
                 mshcomp->encryptCurve25519(entry.header.dstnode, entry.header.srcnode, dstpub, entry.header.packet_id, payload_len, payload, encrypted_payload);
                 payload_len += 12;  // Curve25519 adds 16 bytes overhead
-                ESP_LOGI("SEND", "Curve25519 encrypt to node 0x%08" PRIx32, entry.header.dstnode);
             } else {
                 if (mshcomp->aes_decrypt_meshtastic_payload(entry.key, entry.key_len * 8, entry.header.packet_id, entry.header.srcnode, payload, encrypted_payload, payload_len)) {
-                    ESP_LOGI("SEND", "AES encrypt to node 0x%08" PRIx32, entry.header.dstnode);
                 } else {
                     ESP_LOGE(TAG, "Failed to encrypt payload");
                     continue;
@@ -371,7 +369,6 @@ void MtCompact::task_send(void* pvParameters) {
 
 void MtCompact::task_listen(void* pvParameters) {
     MtCompact* mshcomp = static_cast<MtCompact*>(pvParameters);
-    ESP_LOGI(pcTaskGetName(NULL), "Start");
     uint8_t rxData[256];  // Maximum Payload size of SX1261/62/68 is 255
     mshcomp->radio->startReceive();
     while (mshcomp->need_run) {
@@ -643,31 +640,41 @@ int16_t MtCompact::processPacket(uint8_t* data, int len, MtCompact* mshcomp) {
         header.via_mqtt = !!(packet_flags & PACKET_FLAGS_VIA_MQTT_MASK);
         header.hop_start = (packet_flags & PACKET_FLAGS_HOP_START_MASK) >> PACKET_FLAGS_HOP_START_SHIFT;
 
-        ESP_LOGI(TAG, "Dst: 0x%08" PRIx32 " Src: 0x%08" PRIx32 " PacketId: 0x%08" PRIx32, header.dstnode, header.srcnode, header.packet_id);
-        ESP_LOGI(TAG, "Chan: %u", header.chan_hash);
+        if (debugmode) {
+            ESP_LOGI(TAG, "Dst: 0x%08" PRIx32 " Src: 0x%08" PRIx32 " PacketId: 0x%08" PRIx32, header.dstnode, header.srcnode, header.packet_id);
+            ESP_LOGI(TAG, "Chan: %u", header.chan_hash);
+        }
 
         meshtastic_Data decodedtmp;
         int16_t ret = try_decode_root_packet(&data[16], len - 16, &meshtastic_Data_msg, &decodedtmp, sizeof(decodedtmp), header);
         if (ret >= 0) {
             // extract the want_response from bitfield
             decodedtmp.want_response |= decodedtmp.bitfield & BITFIELD_WANT_RESPONSE_MASK;
-            ESP_LOGI(TAG, "PortNum: %d  PacketId: %lu  Src: 0x%08" PRIx32, decodedtmp.portnum, header.packet_id, header.srcnode);
-            ESP_LOGI(TAG, "Want ack: %d Chan: %u", header.want_ack ? 1 : 0, header.chan_hash);
-            ESP_LOGI(TAG, "Want Response: %d", decodedtmp.want_response);
-            ESP_LOGI(TAG, "Request ID: %" PRIu32, decodedtmp.request_id);
-            ESP_LOGI(TAG, "Reply ID: %" PRIu32, decodedtmp.reply_id);
+            if (debugmode) {
+                ESP_LOGI(TAG, "PortNum: %d  PacketId: %lu  Src: 0x%08" PRIx32, decodedtmp.portnum, header.packet_id, header.srcnode);
+                ESP_LOGI(TAG, "Want ack: %d Chan: %u", header.want_ack ? 1 : 0, header.chan_hash);
+                ESP_LOGI(TAG, "Want Response: %d", decodedtmp.want_response);
+                ESP_LOGI(TAG, "Request ID: %" PRIu32, decodedtmp.request_id);
+                ESP_LOGI(TAG, "Reply ID: %" PRIu32, decodedtmp.reply_id);
+            }
             header.request_id = decodedtmp.request_id;
             header.reply_id = decodedtmp.reply_id;
             // Process the decoded data as needed https://github.com/meshtastic/protobufs/blob/master/meshtastic/portnums.proto
             if (decodedtmp.portnum == 0) {
-                ESP_LOGI(TAG, "Received an unknown packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received an unknown packet");
+                }
             } else if (decodedtmp.portnum == 1) {
-                ESP_LOGI(TAG, "Received a message packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received a message packet");
+                }
                 // payload: utf8 text
                 MCT_TextMessage msg = {std::string(reinterpret_cast<const char*>(decodedtmp.payload.bytes), decodedtmp.payload.size), (uint8_t)ret, MCT_MESSAGE_TYPE_TEXT};
                 intOnMessage(header, msg);
             } else if (decodedtmp.portnum == 2) {
-                ESP_LOGI(TAG, "Received a remote hardware packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received a remote hardware packet");
+                }
                 // payload: protobuf HardwareMessage - NOT INTERESTED IN YET
                 /*meshtastic_HardwareMessage hardware_msg = {};
                 if (pb_decode_from_bytes(decodedtmp.payload.bytes, decodedtmp.payload.size, &meshtastic_HardwareMessage_msg, &hardware_msg)) {
@@ -684,7 +691,9 @@ int16_t MtCompact::processPacket(uint8_t* data, int len, MtCompact* mshcomp) {
                     intOnPositionMessage(header, position_msg, decodedtmp.want_response);
 
                 } else {
-                    ESP_LOGE(TAG, "Failed to decode Position");
+                    if (debugmode) {
+                        ESP_LOGE(TAG, "Failed to decode Position");
+                    }
                 }
                 pb_release(&meshtastic_Position_msg, &position_msg);
             } else if (decodedtmp.portnum == 4) {
@@ -693,83 +702,119 @@ int16_t MtCompact::processPacket(uint8_t* data, int len, MtCompact* mshcomp) {
                 if (pb_decode_from_bytes(decodedtmp.payload.bytes, decodedtmp.payload.size, &meshtastic_User_msg, &user_msg)) {
                     intOnNodeInfo(header, user_msg, decodedtmp.want_response);
                 } else {
-                    ESP_LOGE(TAG, "Failed to decode User");
+                    if (debugmode) {
+                        ESP_LOGE(TAG, "Failed to decode User");
+                    }
                 }
                 pb_release(&meshtastic_User_msg, &user_msg);
             } else if (decodedtmp.portnum == 5) {
-                ESP_LOGI(TAG, "Received a routing packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received a routing packet");
+                }
                 // payload: protobuf Routing
                 meshtastic_Routing routing_msg = {};  // todo process it. this is just a debug. or simply drop it.
                 if (pb_decode_from_bytes(decodedtmp.payload.bytes, decodedtmp.payload.size, &meshtastic_Routing_msg, &routing_msg)) {
-                    ESP_LOGI(TAG, "Routing reply count: %d", routing_msg.route_reply.route_count);
+                    if (debugmode) {
+                        ESP_LOGI(TAG, "Routing reply count: %d", routing_msg.route_reply.route_count);
+                    }
                 } else {
-                    ESP_LOGE(TAG, "Failed to decode Routing");
+                    if (debugmode) {
+                        ESP_LOGE(TAG, "Failed to decode Routing");
+                    }
                 }
                 pb_release(&meshtastic_Routing_msg, &routing_msg);
             } else if (decodedtmp.portnum == 6) {
-                ESP_LOGI(TAG, "Received an admin packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received an admin packet");
+                }
                 // payload: protobuf AdminMessage
                 // drop it, not interested in admin messages
             } else if (decodedtmp.portnum == 7) {
-                ESP_LOGI(TAG, "Received a compressed text message packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received a compressed text message packet");
+                }
                 // payload: utf8 text with Unishox2 Compression
                 char uncompressed_data[256] = {0};
                 size_t uncompressed_size = unishox2_decompress((const char*)&decodedtmp.payload.bytes, decodedtmp.payload.size, uncompressed_data, sizeof(uncompressed_data), USX_PSET_DFLT);
                 MCT_TextMessage msg = {std::string(reinterpret_cast<const char*>(uncompressed_data), uncompressed_size), (uint8_t)ret, MCT_MESSAGE_TYPE_TEXT};
                 intOnMessage(header, msg);
             } else if (decodedtmp.portnum == 8) {
-                ESP_LOGI(TAG, "Received a waypoint packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received a waypoint packet");
+                }
                 // payload: protobuf Waypoint
                 meshtastic_Waypoint waypoint_msg = {};  // todo store and callbacke
                 if (pb_decode_from_bytes(decodedtmp.payload.bytes, decodedtmp.payload.size, &meshtastic_Waypoint_msg, &waypoint_msg)) {
                     intOnWaypointMessage(header, waypoint_msg);
                 } else {
-                    ESP_LOGE(TAG, "Failed to decode Waypoint");
+                    if (debugmode) {
+                        ESP_LOGE(TAG, "Failed to decode Waypoint");
+                    }
                 }
                 pb_release(&meshtastic_Waypoint_msg, &waypoint_msg);
             } else if (decodedtmp.portnum == 10) {
-                ESP_LOGI(TAG, "Received a detection sensor packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received a detection sensor packet");
+                }
                 // payload: utf8 text
                 MCT_TextMessage msg = {std::string(reinterpret_cast<const char*>(decodedtmp.payload.bytes), decodedtmp.payload.size), (uint8_t)ret, MCT_MESSAGE_TYPE_DETECTION_SENSOR};
                 intOnMessage(header, msg);
             } else if (decodedtmp.portnum == 11) {
-                ESP_LOGI(TAG, "Received an alert packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received an alert packet");
+                }
                 // payload: utf8 text
                 MCT_TextMessage msg = {std::string(reinterpret_cast<const char*>(decodedtmp.payload.bytes), decodedtmp.payload.size), (uint8_t)ret, MCT_MESSAGE_TYPE_ALERT};
                 intOnMessage(header, msg);
             } else if (decodedtmp.portnum == 12) {
-                ESP_LOGI(TAG, "Received a key verification packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received a key verification packet");
+                }
                 // payload: protobuf KeyVerification
                 meshtastic_KeyVerification key_verification_msg = {};  // todo drop?
                 if (pb_decode_from_bytes(decodedtmp.payload.bytes, decodedtmp.payload.size, &meshtastic_KeyVerification_msg, &key_verification_msg)) {
                     ;
                 } else {
-                    ESP_LOGE(TAG, "Failed to decode KeyVerification");
+                    if (debugmode) {
+                        ESP_LOGE(TAG, "Failed to decode KeyVerification");
+                    }
                 }
                 pb_release(&meshtastic_KeyVerification_msg, &key_verification_msg);
             } else if (decodedtmp.portnum == 32) {
-                ESP_LOGI(TAG, "Received a reply packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received a reply packet");
+                }
                 // payload: ASCII Plaintext //TODO determine the in/out part and send reply if needed
                 MCT_TextMessage msg = {std::string(reinterpret_cast<const char*>(decodedtmp.payload.bytes), decodedtmp.payload.size), (uint8_t)ret, MCT_MESSAGE_TYPE_PING};
                 intOnMessage(header, msg);
             } else if (decodedtmp.portnum == 34) {
-                ESP_LOGI(TAG, "Received a paxcounter packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received a paxcounter packet");
+                }
                 // payload: protobuf DROP
             } else if (decodedtmp.portnum == 64) {
-                ESP_LOGI(TAG, "Received a serial packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received a serial packet");
+                }
                 // payload: uart rx/tx data
                 MCT_TextMessage msg = {std::string(reinterpret_cast<const char*>(decodedtmp.payload.bytes), decodedtmp.payload.size), (uint8_t)ret, MCT_MESSAGE_TYPE_UART};
                 intOnMessage(header, msg);
             } else if (decodedtmp.portnum == 65) {
-                ESP_LOGI(TAG, "Received a STORE_FORWARD_APP  packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received a STORE_FORWARD_APP  packet");
+                }
                 // payload: ?
             } else if (decodedtmp.portnum == 66) {
-                ESP_LOGI(TAG, "Received a RANGE_TEST_APP  packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received a RANGE_TEST_APP  packet");
+                }
                 // payload: ascii text
                 MCT_TextMessage msg = {std::string(reinterpret_cast<const char*>(decodedtmp.payload.bytes), decodedtmp.payload.size), (uint8_t)ret, MCT_MESSAGE_TYPE_RANGE_TEST};
                 intOnMessage(header, msg);
             } else if (decodedtmp.portnum == 67) {
-                ESP_LOGI(TAG, "Received a TELEMETRY_APP   packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received a TELEMETRY_APP   packet");
+                }
                 // payload: Protobuf
                 meshtastic_Telemetry telemetry_msg = {};  // todo store and callback
                 if (pb_decode_from_bytes(decodedtmp.payload.bytes, decodedtmp.payload.size, &meshtastic_Telemetry_msg, &telemetry_msg)) {
@@ -800,19 +845,27 @@ int16_t MtCompact::processPacket(uint8_t* data, int len, MtCompact* mshcomp) {
                             break;
                     };
                 } else {
-                    ESP_LOGE(TAG, "Failed to decode Telemetry");
+                    if (debugmode) {
+                        ESP_LOGE(TAG, "Failed to decode Telemetry");
+                    }
                 }
                 pb_release(&meshtastic_Telemetry_msg, &telemetry_msg);
             } else if (decodedtmp.portnum == 70) {
-                ESP_LOGI(TAG, "Received a TRACEROUTE_APP    packet");
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received a TRACEROUTE_APP packet");
+                }
                 // payload: Protobuf RouteDiscovery
                 meshtastic_RouteDiscovery route_discovery_msg = {};  // drop
                 if (pb_decode_from_bytes(decodedtmp.payload.bytes, decodedtmp.payload.size, &meshtastic_RouteDiscovery_msg, &route_discovery_msg)) {
-                    ESP_LOGI(TAG, "Route Discovery: Hop Count: %d", route_discovery_msg.route_count);
+                    if (debugmode) {
+                        ESP_LOGI(TAG, "Route Discovery: Hop Count: %d", route_discovery_msg.route_count);
+                    }
                     // header.request_id ==0 --route back
                     intOnTraceroute(header, route_discovery_msg);
                 } else {
-                    ESP_LOGE(TAG, "Failed to decode RouteDiscovery");
+                    if (debugmode) {
+                        ESP_LOGE(TAG, "Failed to decode RouteDiscovery");
+                    }
                 }
                 pb_release(&meshtastic_RouteDiscovery_msg, &route_discovery_msg);
             } else if (decodedtmp.portnum == 71) {
@@ -823,7 +876,9 @@ int16_t MtCompact::processPacket(uint8_t* data, int len, MtCompact* mshcomp) {
                 }
                 pb_release(&meshtastic_NeighborInfo_msg, &neighbor_info_msg);
             } else {
-                ESP_LOGI(TAG, "Received an unhandled portnum: %d", decodedtmp.portnum);
+                if (debugmode) {
+                    ESP_LOGI(TAG, "Received an unhandled portnum: %d", decodedtmp.portnum);
+                }
             }
             if (header.want_ack && is_send_enabled && !is_in_stealth_mode && header.dstnode == my_nodeinfo.node_id) {
                 send_ack(header);
@@ -847,7 +902,9 @@ void MtCompact::setMyNames(const char* short_name, const char* long_name) {
 bool MtCompact::aes_decrypt_meshtastic_payload(const uint8_t* key, uint16_t keySize, uint32_t packet_id, uint32_t from_node, const uint8_t* encrypted_in, uint8_t* decrypted_out, size_t len) {
     int ret = mbedtls_aes_setkey_enc(&aes_ctx, key, keySize);
     if (ret != 0) {
-        ESP_LOGE(TAG, "mbedtls_aes_setkey_enc failed with error: -0x%04x", -ret);
+        if (debugmode) {
+            ESP_LOGE(TAG, "mbedtls_aes_setkey_enc failed with error: -0x%04x", -ret);
+        }
         // mbedtls_aes_free(&aes_ctx);
         return false;
     }
@@ -859,7 +916,9 @@ bool MtCompact::aes_decrypt_meshtastic_payload(const uint8_t* key, uint16_t keyS
     memcpy(nonce + 8, &from_node, sizeof(uint32_t));
     ret = mbedtls_aes_crypt_ctr(&aes_ctx, len, &nc_off, nonce, stream_block, encrypted_in, decrypted_out);
     if (ret != 0) {
-        ESP_LOGE(TAG, "mbedtls_aes_crypt_ctr failed with error: -0x%04x", -ret);
+        if (debugmode) {
+            ESP_LOGE(TAG, "mbedtls_aes_crypt_ctr failed with error: -0x%04x", -ret);
+        }
         // mbedtls_aes_free(&aes_ctx);
         return false;
     }
@@ -869,7 +928,9 @@ bool MtCompact::aes_decrypt_meshtastic_payload(const uint8_t* key, uint16_t keyS
 bool MtCompact::pb_decode_from_bytes(const uint8_t* srcbuf, size_t srcbufsize, const pb_msgdesc_t* fields, void* dest_struct) {
     pb_istream_t stream = pb_istream_from_buffer(srcbuf, srcbufsize);
     if (!pb_decode(&stream, fields, dest_struct)) {
-        ESP_LOGI("PB", "Can't decode protobuf reason='%s', pb_msgdesc %p", PB_GET_ERROR(&stream), fields);
+        if (debugmode) {
+            ESP_LOGI("PB", "Can't decode protobuf reason='%s', pb_msgdesc %p", PB_GET_ERROR(&stream), fields);
+        }
         return false;
     } else {
         return true;
@@ -917,7 +978,9 @@ int16_t MtCompact::try_decode_root_packet(const uint8_t* srcbuf, size_t srcbufsi
 
         return -1;
     }
-    ESP_LOGI(TAG, "can't decode packet");
+    if (debugmode) {
+        ESP_LOGI(TAG, "can't decode packet");
+    }
     return -1;
 }
 
@@ -1311,7 +1374,9 @@ bool MtCompact::encryptCurve25519(uint32_t toNode, uint32_t fromNode, uint8_t* r
     }
     hash(shared_key, 32);
     initNonce(fromNode, packetNum, extraNonceTmp);
-    ESP_LOGI("MT_CRYPTO", "Encrypting with Curve25519  packet %llu extraNonce %ld", packetNum, extraNonceTmp);
+    if (debugmode) {
+        ESP_LOGI("MT_CRYPTO", "Encrypting with Curve25519  packet %llu extraNonce %ld", packetNum, extraNonceTmp);
+    }
     // Calculate the shared secret with the destination node and encrypt
     aes_ccm_ae(shared_key, 32, nonce, 8, bytes, numBytes, nullptr, 0, bytesOut, auth, aes);  // this can write up to 15 bytes longer than numbytes past bytesOut
     memcpy((uint8_t*)(auth + 8), &extraNonceTmp, sizeof(uint32_t));                          // do not use dereference on potential non aligned pointers : *extraNonce = extraNonceTmp;
@@ -1338,7 +1403,9 @@ bool MtCompact::setDHPublicKey(uint8_t* pubKey) {
     // Calculate the shared secret with the specified node's public key and our private key
     // This includes an internal weak key check, which among other things looks for an all 0 public key and shared key.
     if (!Curve25519::dh2(shared_key, local_priv)) {
-        ESP_LOGE("MT_CRYPTO", "Curve25519DH step 2 failed!");
+        if (debugmode) {
+            ESP_LOGE("MT_CRYPTO", "Curve25519DH step 2 failed!");
+        }
         return false;
     }
     return true;
