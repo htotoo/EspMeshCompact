@@ -965,11 +965,13 @@ int16_t MtCompact::try_decode_root_packet(const uint8_t* srcbuf, size_t srcbufsi
         }
     }
 
-    if (header.chan_hash == 0 && header.dstnode != 0xffffffff) {
+    if (header.chan_hash == 0 && header.dstnode != 0xffffffff && header.srcnode != my_nodeinfo.node_id) {
         auto nodeinfo = nodeinfo_db.get(header.srcnode);
         if (nodeinfo != nullptr) {
+            ESP_LOGI(TAG, "Trying Curve25519 decryption for node 0x%08" PRIx32 ", packet id 0x%08" PRIx32, header.srcnode, header.packet_id);
             bool ret = decryptCurve25519(header.srcnode, nodeinfo->public_key, header.packet_id, srcbufsize, srcbuf, decrypted_data);
             if (ret) {
+                ESP_LOGI(TAG, "Curve25519 decryption successful for node 0x%08" PRIx32 ", packet id 0x%08" PRIx32, header.srcnode, header.packet_id);
                 if (pb_decode_from_bytes(decrypted_data, srcbufsize - 12, fields, dest_struct)) {
                     return 0;
                 }

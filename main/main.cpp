@@ -55,21 +55,25 @@ extern "C" void app_main(void) {
 
     memcpy(mesh.getMyNodeInfo()->private_key, my_p_key, 32);
     MtCompactHelpers::RegenerateOrGeneratePrivateKey(*mesh.getMyNodeInfo());
-    mesh.loadPrivKey();
+    mesh.setDebugMode(true);
+    // mesh.loadPrivKey();
     mesh.loadNodeDb();
     mesh.chan_mgr.addDefaultChannels();
     mesh.chan_mgr.addDefaultEncryption("Hungary");
     mesh.sendMyNodeInfo();
+    mesh.setOnMessage([](MCT_Header& header, MCT_TextMessage& message) {
+        ESP_LOGI("OnMessage", "Received message from node 0x%08" PRIx32 ": %s", header.srcnode, message.text.c_str());
+    });
     vTaskDelay(pdMS_TO_TICKS(10000));
     // ESP_LOGI("Main", "Sending nodeinfo...");
-    mesh.sendMyNodeInfo(0xb29facf4, true);
+    mesh.sendMyNodeInfo(0xa0cc18fc, true);
     vTaskDelay(pdMS_TO_TICKS(20000));
     std::string test_msg = "Hello from EspMeshtasticCompact!";
     ESP_LOGI("Main", "Sending test message");
-    // mesh.sendTextMessage(test_msg, 0x0xb29facf4, 0);
+    // mesh.sendTextMessage(test_msg, 0x433ad734, 0);
     while (true) {
-        vTaskDelay(pdMS_TO_TICKS(60000));
-        mesh.sendTextMessage(test_msg, 0xb29facf4, 0, MCT_MESSAGE_TYPE_ALERT, 0);
+        vTaskDelay(pdMS_TO_TICKS(10000));
+        mesh.sendTextMessage(test_msg, 0xa0cc18fc, 0, MCT_MESSAGE_TYPE_TEXT, 0);
         if (mesh.nodeinfo_db.needsSave(60000)) {
             ESP_LOGI("Main", "Saving Node DB...");
             mesh.saveNodeDb();
