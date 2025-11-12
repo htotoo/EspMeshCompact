@@ -54,10 +54,10 @@ extern "C" void app_main(void) {
                             0xd3, 0xaa, 0xe5, 0x0c, 0x22, 0xba, 0x0b, 0x74};
 
     memcpy(mesh.getMyNodeInfo()->private_key, my_p_key, 32);
-    MtCompactHelpers::RegenerateOrGeneratePrivateKey(*mesh.getMyNodeInfo());
     mesh.setDebugMode(true);
-    // mesh.loadPrivKey();
+    mesh.loadPrivKey();
     mesh.loadNodeDb();
+    mesh.savePrivKey();
     mesh.chan_mgr.addDefaultChannels();
     mesh.chan_mgr.addDefaultEncryption("Hungary");
     mesh.sendMyNodeInfo();

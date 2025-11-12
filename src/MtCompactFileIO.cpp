@@ -80,7 +80,7 @@ bool MtCompactFileIO::savePrivateKey(MCT_MyNodeInfo& my_nodeinfo) {
         return false;
     }
 
-    err = nvs_set_blob(handle, "priv_key", my_nodeinfo.private_key, sizeof(my_nodeinfo.private_key));
+    err = nvs_set_blob(handle, "priv_key", my_nodeinfo.private_key, 32);
     if (err != ESP_OK) {
         nvs_close(handle);
         return false;
@@ -99,7 +99,7 @@ bool MtCompactFileIO::loadPrivateKey(MCT_MyNodeInfo& my_nodeinfo) {
         return false;
     }
 
-    size_t required_size = sizeof(my_nodeinfo.private_key);
+    size_t required_size = 32;
     err = nvs_get_blob(handle, "priv_key", my_nodeinfo.private_key, &required_size);
     nvs_close(handle);
     if (err != ESP_OK) {
