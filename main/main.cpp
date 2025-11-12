@@ -53,9 +53,8 @@ extern "C" void app_main(void) {
                             0xd3, 0xaa, 0xe5, 0x0c, 0x22, 0xba, 0x0b, 0x74};
     memcpy(mesh.getMyNodeInfo()->private_key, my_p_key, 32);
     MtCompactHelpers::RegenerateOrGeneratePrivateKey(*mesh.getMyNodeInfo());
-    for (int i = 0; i < 32; i++) {
-        printf("%02x, ", mesh.getMyNodeInfo()->public_key[i]);
-    }
+    mesh.loadPrivKey();
+    mesh.loadNodeDb();
     mesh.sendMyNodeInfo();
     vTaskDelay(pdMS_TO_TICKS(10000));
     // ESP_LOGI("Main", "Sending nodeinfo...");
@@ -67,5 +66,9 @@ extern "C" void app_main(void) {
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(60000));
         mesh.sendTextMessage(test_msg, 0xb29facf4, 0, MCT_MESSAGE_TYPE_ALERT, 0);
+        if (mesh.nodeinfo_db.needsSave(60000)) {
+            ESP_LOGI("Main", "Saving Node DB...");
+            mesh.saveNodeDb();
+        }
     }
 }

@@ -10,4 +10,9 @@ class MtCompactFileIO {
 
     // Load the nodedb
     static bool loadNodeDb(NodeInfoDB& db);
+
+    // Save the private key
+    static bool savePrivateKey(MCT_MyNodeInfo& my_nodeinfo);
+    // Load the private key
+    static bool loadPrivateKey(MCT_MyNodeInfo& my_nodeinfo);
 };

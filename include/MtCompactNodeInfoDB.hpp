@@ -6,6 +6,7 @@
 #include <string.h>
 #include "MtCompactStructs.hpp"
 #include "esp_random.h"
+#include "esp_timer.h"
 #include <vector>
 /**
  * @brief Handles an in-memory database of node information.
@@ -103,6 +104,7 @@ class NodeInfoDB {
         for (size_t i = 0; i < MAX_NODES; ++i) {
             if (valid[i] && nodeinfos[i].node_id == node_id) {
                 nodeinfos[i] = info;
+                changed = true;
                 return false;
             }
         }
@@ -114,6 +116,7 @@ class NodeInfoDB {
                 is_position_valid[i] = false;
                 positions[i].has_latitude_i = false;
                 positions[i].has_longitude_i = false;
+                changed = true;
                 return true;
             }
         }
@@ -131,6 +134,7 @@ class NodeInfoDB {
         is_position_valid[oldest_idx] = false;
         positions[oldest_idx].has_latitude_i = false;
         positions[oldest_idx].has_longitude_i = false;
+        changed = true;
         return true;
     }
 
@@ -159,6 +163,7 @@ class NodeInfoDB {
             if (valid[i] && nodeinfos[i].node_id == node_id) {
                 valid[i] = false;
                 nodeinfos[i].node_id = 0;
+                changed = true;
                 return;
             }
         }
@@ -174,6 +179,7 @@ class NodeInfoDB {
             nodeinfos[i].node_id = 0;
             is_position_valid[i] = false;
         }
+        changed = true;
     }
 
     /**
@@ -207,6 +213,7 @@ class NodeInfoDB {
             if (valid[i] && nodeinfos[i].node_id == node_id) {
                 positions[i] = position;
                 is_position_valid[i] = true;
+                changed = true;
                 return true;
             }
         }
@@ -224,6 +231,7 @@ class NodeInfoDB {
                 is_position_valid[i] = false;
                 // Optionally clear position data:
                 positions[i] = MCT_Position{};
+                changed = true;
                 return;
             }
         }
@@ -259,9 +267,27 @@ class NodeInfoDB {
         return true;
     }
 
+    void clearChangedFlag() {
+        changed = false;
+        last_save_time = esp_timer_get_time() / 1000;
+    }
+    bool hasChanged() {
+        return changed;
+    }
+
+    bool needsSave(uint32_t interval_ms = 60000) {
+        uint64_t current_time = esp_timer_get_time() / 1000;
+        if (changed && (current_time - last_save_time >= interval_ms)) {
+            return true;
+        }
+        return false;
+    }
+
    private:
     MCT_NodeInfo nodeinfos[MAX_NODES];
     MCT_Position positions[MAX_NODES];
     bool is_position_valid[MAX_NODES] = {};  // stores if the position is stored for the node
     bool valid[MAX_NODES] = {};              // stores if the index is taken or free
+    bool changed = false;                    // internal flag to track changes
+    uint64_t last_save_time = 0;
 };

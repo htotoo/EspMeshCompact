@@ -72,3 +72,39 @@ bool MtCompactFileIO::loadNodeDb(NodeInfoDB& db) {
     return db.deserialize(buffer);
     return false;
 }
+
+bool MtCompactFileIO::savePrivateKey(MCT_MyNodeInfo& my_nodeinfo) {
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open("meshtastic", NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        return false;
+    }
+
+    err = nvs_set_blob(handle, "priv_key", my_nodeinfo.private_key, sizeof(my_nodeinfo.private_key));
+    if (err != ESP_OK) {
+        nvs_close(handle);
+        return false;
+    }
+
+    err = nvs_commit(handle);
+    nvs_close(handle);
+
+    return err == ESP_OK;
+}
+
+bool MtCompactFileIO::loadPrivateKey(MCT_MyNodeInfo& my_nodeinfo) {
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open("meshtastic", NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return false;
+    }
+
+    size_t required_size = sizeof(my_nodeinfo.private_key);
+    err = nvs_get_blob(handle, "priv_key", my_nodeinfo.private_key, &required_size);
+    nvs_close(handle);
+    if (err != ESP_OK) {
+        return false;
+    }
+
+    return true;
+}
