@@ -656,6 +656,8 @@ int16_t MtCompact::processPacket(uint8_t* data, int len, MtCompact* mshcomp) {
                 ESP_LOGI(TAG, "Want Response: %d", decodedtmp.want_response);
                 ESP_LOGI(TAG, "Request ID: %" PRIu32, decodedtmp.request_id);
                 ESP_LOGI(TAG, "Reply ID: %" PRIu32, decodedtmp.reply_id);
+                ESP_LOGI(TAG, "Emoji: %lu", decodedtmp.emoji);
+                ESP_LOGI(TAG, "Bitfield: %u", decodedtmp.bitfield);
             }
             header.request_id = decodedtmp.request_id;
             header.reply_id = decodedtmp.reply_id;
@@ -1125,6 +1127,8 @@ void MtCompact::sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode, bool exch
     user_msg.is_licensed = false;
     user_msg.is_unmessagable = false;
     entry.data.portnum = meshtastic_PortNum_NODEINFO_APP;
+    entry.data.request_id = 0;
+    entry.data.reply_id = 0;
     entry.data.want_response = exchange;
     entry.data.payload.size = pb_encode_to_bytes((uint8_t*)&entry.data.payload.bytes, sizeof(entry.data.payload.bytes), &meshtastic_User_msg, &user_msg);
     entry.key = (uint8_t*)default_l1_key;    // Use default channel key for encryption
@@ -1132,20 +1136,22 @@ void MtCompact::sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode, bool exch
     out_queue.push(entry);
 }
 
-void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint16_t chan, MCT_MESSAGE_TYPE type, uint32_t sender_node_id) {
+void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint16_t chan, MCT_MESSAGE_TYPE type, uint32_t sender_node_id, uint32_t replyid, bool emoji) {
     if (!is_send_enabled) return;
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dstnode;
     entry.header.srcnode = sender_node_id == 0 ? my_nodeinfo.node_id : sender_node_id;
     entry.header.packet_id = 0;
     entry.header.hop_limit = send_hop_limit;
-    entry.header.want_ack = 1;
+    entry.header.want_ack = emoji ? 0 : 1;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
     entry.header.chan_hash = chan >= 256 ? pri_chan_hash : (uint8_t)chan;
     if (dstnode != 0xffffffff) entry.header.chan_hash = 0;  // Use 0 for private msgs
     entry.header.via_mqtt = 0;
     entry.encType = 0;
+    entry.data.request_id = 0;
+    entry.data.reply_id = replyid;
     entry.data.payload.size = text.size();
     memcpy(entry.data.payload.bytes, text.data(), text.size());
     entry.data.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;  // NodeInfo portnum
@@ -1161,6 +1167,8 @@ void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint1
         entry.data.portnum = meshtastic_PortNum_DETECTION_SENSOR_APP;
     }
     entry.data.want_response = 0;
+    entry.data.emoji = emoji ? 1 : 0;
+
     entry.data.bitfield = 0;
     if (ok_to_mqtt) entry.data.bitfield |= 1 << BITFIELD_OK_TO_MQTT_SHIFT;  // Set the MQTT upload bit
     entry.data.has_bitfield = true;

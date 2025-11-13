@@ -66,17 +66,19 @@ extern "C" void app_main(void) {
     });
     vTaskDelay(pdMS_TO_TICKS(10000));
     // ESP_LOGI("Main", "Sending nodeinfo...");
-    mesh.sendMyNodeInfo(0xa0cc18fc, true);
+    // mesh.sendMyNodeInfo(0xa0cc18fc, true);
     vTaskDelay(pdMS_TO_TICKS(20000));
-    std::string test_msg = "Hello from EspMeshtasticCompact!";
-    ESP_LOGI("Main", "Sending test message");
-    // mesh.sendTextMessage(test_msg, 0x433ad734, 0);
+    std::string test_msg = "pong 18 hops";
+
+    // mesh.sendTextMessage(test_msg, 0xffffffff, 92, MCT_MESSAGE_TYPE_TEXT, 0, 2257061455, true);
     while (true) {
-        vTaskDelay(pdMS_TO_TICKS(10000));
-        mesh.sendTextMessage(test_msg, 0xa0cc18fc, 0, MCT_MESSAGE_TYPE_TEXT, 0);
-        if (mesh.nodeinfo_db.needsSave(60000)) {
+        vTaskDelay(pdMS_TO_TICKS(30000));
+        ESP_LOGI("Main", "Sending test message");
+        mesh.sendTextMessage(test_msg, 0xffffffff, 31, MCT_MESSAGE_TYPE_TEXT, 0, 4074877044, true);
+        if (mesh.nodeinfo_db.needsSave(1800000)) {
             ESP_LOGI("Main", "Saving Node DB...");
             mesh.saveNodeDb();
+            mesh.nodeinfo_db.clearChangedFlag();
         }
     }
 }

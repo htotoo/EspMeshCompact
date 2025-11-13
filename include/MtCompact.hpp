@@ -128,7 +128,7 @@ class MtCompact {
     void sendMyNodeInfo(uint32_t dstnode = 0xffffffff, bool exchange = false) {
         sendNodeInfo(my_nodeinfo, dstnode, exchange);
     }
-    void sendTextMessage(const std::string& text, uint32_t dstnode = 0xffffffff, uint16_t chan = 256, MCT_MESSAGE_TYPE type = MCT_MESSAGE_TYPE_TEXT, uint32_t sender_node_id = 0);
+    void sendTextMessage(const std::string& text, uint32_t dstnode = 0xffffffff, uint16_t chan = 256, MCT_MESSAGE_TYPE type = MCT_MESSAGE_TYPE_TEXT, uint32_t sender_node_id = 0, uint32_t replyid = 0, bool emoji = false);
     void sendPositionMessage(MCT_Position& position, uint32_t dstnode = 0xffffffff, uint16_t chan = 256, uint32_t sender_node_id = 0);
     void sendMyPosition(uint32_t dstnode = 0xffffffff, uint16_t chan = 256) {
         sendPositionMessage(my_position, dstnode, chan);
