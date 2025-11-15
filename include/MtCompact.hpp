@@ -167,6 +167,8 @@ class MtCompact {
         }
     }
 
+    void printKeysHex();  // prints the private and public keys in hex format for debugging
+
     NodeInfoDB nodeinfo_db;    // NodeInfo database.
     MtCompactRouter router;    // Router for message deduplication. Set MyId if you changed that. Also you can disable exclude self option
     MCT_Position my_position;  // My position, used for auto replies (when enabled) on position requests. Or when you call sendMyPosition()

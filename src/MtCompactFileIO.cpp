@@ -75,13 +75,15 @@ bool MtCompactFileIO::loadNodeDb(NodeInfoDB& db) {
 
 bool MtCompactFileIO::savePrivateKey(MCT_MyNodeInfo& my_nodeinfo) {
     nvs_handle_t handle;
-    esp_err_t err = nvs_open("meshtastic", NVS_READWRITE, &handle);
+    esp_err_t err = nvs_open("mtpriv", NVS_READWRITE, &handle);
     if (err != ESP_OK) {
+        ESP_LOGE("MtCompactFileIO", "Failed to open NVS namespace 'mtpriv' for writing private key. Err: %d", err);
         return false;
     }
 
     err = nvs_set_blob(handle, "priv_key", my_nodeinfo.private_key, 32);
     if (err != ESP_OK) {
+        ESP_LOGE("MtCompactFileIO", "Failed to write private key to NVS. Err: %d", err);
         nvs_close(handle);
         return false;
     }
@@ -94,8 +96,9 @@ bool MtCompactFileIO::savePrivateKey(MCT_MyNodeInfo& my_nodeinfo) {
 
 bool MtCompactFileIO::loadPrivateKey(MCT_MyNodeInfo& my_nodeinfo) {
     nvs_handle_t handle;
-    esp_err_t err = nvs_open("meshtastic", NVS_READONLY, &handle);
+    esp_err_t err = nvs_open("mtpriv", NVS_READONLY, &handle);
     if (err != ESP_OK) {
+        ESP_LOGE("MtCompactFileIO", "Failed to open NVS namespace 'mtpriv' for reading private key. Err: %d", err);
         return false;
     }
 
@@ -103,6 +106,7 @@ bool MtCompactFileIO::loadPrivateKey(MCT_MyNodeInfo& my_nodeinfo) {
     err = nvs_get_blob(handle, "priv_key", my_nodeinfo.private_key, &required_size);
     nvs_close(handle);
     if (err != ESP_OK) {
+        ESP_LOGE("MtCompactFileIO", "Failed to read private key from NVS. Err: %d", err);
         return false;
     }
 

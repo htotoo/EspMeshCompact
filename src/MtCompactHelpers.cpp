@@ -86,6 +86,7 @@ void MtCompactHelpers::GeneratePrivateKey(uint8_t* private_key, uint8_t& key_siz
 }
 
 void MtCompactHelpers::RegenerateOrGeneratePrivateKey(uint8_t* private_key, uint8_t& key_size, uint8_t* public_key) {
+    memset(public_key, 0, 32);
     if (!Curve25519::eval(public_key, private_key, 0)) {
         ESP_LOGI("MtCompactHelpers", "Generating private key as existing one is invalid");
         GeneratePrivateKey(private_key, key_size, public_key);

@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include "nvs_flash.h"
+#include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
@@ -34,6 +36,13 @@ LoraConfig lora_config_mt = {
 MtCompact mesh;
 
 extern "C" void app_main(void) {
+    // nvsinit.must be done!
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+
     mesh.RadioInit(RadioType::SX1262, radio_pins, lora_config_mt);
     mesh.setOkToMqtt(true);
     std::string sn = "Info";
@@ -54,8 +63,8 @@ extern "C" void app_main(void) {
                             0xd3, 0xaa, 0xe5, 0x0c, 0x22, 0xba, 0x0b, 0x74};
 
     memcpy(mesh.getMyNodeInfo()->private_key, my_p_key, 32);
+    MtCompactHelpers::RegenerateOrGeneratePrivateKey(*mesh.getMyNodeInfo());
     mesh.setDebugMode(true);
-    mesh.loadPrivKey();
     mesh.loadNodeDb();
     mesh.savePrivKey();
     mesh.chan_mgr.addDefaultChannels();
@@ -74,7 +83,7 @@ extern "C" void app_main(void) {
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(30000));
         ESP_LOGI("Main", "Sending test message");
-        mesh.sendTextMessage(test_msg, 0xffffffff, 31, MCT_MESSAGE_TYPE_TEXT, 0, 4074877044, true);
+        mesh.sendTextMessage(test_msg, 0x433ad734, 31, MCT_MESSAGE_TYPE_TEXT, 0, 4074877044, true);
         if (mesh.nodeinfo_db.needsSave(1800000)) {
             ESP_LOGI("Main", "Saving Node DB...");
             mesh.saveNodeDb();

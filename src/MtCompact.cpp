@@ -1422,3 +1422,22 @@ bool MtCompact::setDHPublicKey(uint8_t* pubKey) {
 }
 
 #pragma endregion
+
+void MtCompact::printKeysHex() {
+    ESP_LOGI("MT_KEYS", "MY priv key: ");
+    std::string keytxt = "";
+    for (size_t i = 0; i < my_nodeinfo.public_key_size; i++) {
+        char buf[3];
+        sprintf(buf, "%02X", my_nodeinfo.private_key[i]);
+        keytxt += buf;
+    }
+    ESP_LOGI("MT_KEYS", "%s", keytxt.c_str());
+    keytxt = "";
+    ESP_LOGI("MT_KEYS", "MY pub key: ");
+    for (size_t i = 0; i < my_nodeinfo.public_key_size; i++) {
+        char buf[3];
+        sprintf(buf, "%02X", my_nodeinfo.public_key[i]);
+        keytxt += buf;
+    }
+    ESP_LOGI("MT_KEYS", "%s", keytxt.c_str());
+}
