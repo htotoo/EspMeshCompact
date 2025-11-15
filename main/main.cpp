@@ -84,7 +84,7 @@ extern "C" void app_main(void) {
         vTaskDelay(pdMS_TO_TICKS(30000));
         ESP_LOGI("Main", "Sending test message");
         mesh.sendTextMessage(test_msg, 0x433ad734, 31, MCT_MESSAGE_TYPE_TEXT, 0, 4074877044, true);
-        if (mesh.nodeinfo_db.needsSave(1800000)) {
+        if (mesh.nodeinfo_db.needsSave(60000 * 5)) {
             ESP_LOGI("Main", "Saving Node DB...");
             mesh.saveNodeDb();
             mesh.nodeinfo_db.clearChangedFlag();
