@@ -1136,7 +1136,7 @@ void MtCompact::sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode, bool exch
     out_queue.push(entry);
 }
 
-void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint16_t chan, MCT_MESSAGE_TYPE type, uint32_t sender_node_id, uint32_t replyid, bool emoji) {
+void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint16_t chan, MCT_MESSAGE_TYPE type, uint32_t sender_node_id, uint32_t replyid, bool emoji, uint8_t encryption) {
     if (!is_send_enabled) return;
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dstnode;
@@ -1149,7 +1149,9 @@ void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint1
     entry.header.chan_hash = chan >= 256 ? pri_chan_hash : (uint8_t)chan;
     if (dstnode != 0xffffffff) entry.header.chan_hash = 0;  // Use 0 for private msgs
     entry.header.via_mqtt = 0;
-    entry.encType = 0;
+    if (encryption > 2) encryption = 0;
+    if (dstnode == 0xffffffff && encryption == 2) encryption = 1;  // broadcast cannot use curve25519
+    entry.encType = encryption;
     entry.data.request_id = 0;
     entry.data.reply_id = replyid;
     entry.data.payload.size = text.size();

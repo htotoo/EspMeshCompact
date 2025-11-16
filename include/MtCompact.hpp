@@ -121,14 +121,33 @@ class MtCompact {
         return &my_nodeinfo;
     }
 
-    void setOkToMqtt(bool ok) { ok_to_mqtt = ok; }  // if true, sets the flag in the header
+    void setOkToMqtt(bool ok) { ok_to_mqtt = ok; }  // if true, sets the flag in the header, the messages can sent to mqtt broker
 
     // packet senders
+    /**
+     * @brief Send node information
+     *
+     * @param nodeinfo The nodeinfo to send out
+     * @param dstnode Destination node ID. 0xffffffff = broadcast
+     * @param exchange Whether to exchange node information (i.e., request a reply)
+     */
     void sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode = 0xffffffff, bool exchange = false);
     void sendMyNodeInfo(uint32_t dstnode = 0xffffffff, bool exchange = false) {
         sendNodeInfo(my_nodeinfo, dstnode, exchange);
     }
-    void sendTextMessage(const std::string& text, uint32_t dstnode = 0xffffffff, uint16_t chan = 256, MCT_MESSAGE_TYPE type = MCT_MESSAGE_TYPE_TEXT, uint32_t sender_node_id = 0, uint32_t replyid = 0, bool emoji = false);
+    /**
+     * @brief Send a text message
+     *
+     * @param text What to send. Length is limitted!
+     * @param dstnode Destination node ID. 0xffffffff = broadcast
+     * @param chan Channel's hash we want to send to. 0 = private msg. LongFast = 8 for example.
+     * @param type Message type (MCT_MESSAGE_TYPE)
+     * @param sender_node_id Sender node ID. Who am i. 0 = mynodeid
+     * @param replyid Reply ID. The message id we are replying to
+     * @param emoji Is it considered an emoji? needs replyid
+     * @param encryption Encryption type (0 = auto, 1 = AES, 2 = Curve25519
+     */
+    void sendTextMessage(const std::string& text, uint32_t dstnode = 0xffffffff, uint16_t chan = 256, MCT_MESSAGE_TYPE type = MCT_MESSAGE_TYPE_TEXT, uint32_t sender_node_id = 0, uint32_t replyid = 0, bool emoji = false, uint8_t encryption = 0);
     void sendPositionMessage(MCT_Position& position, uint32_t dstnode = 0xffffffff, uint16_t chan = 256, uint32_t sender_node_id = 0);
     void sendMyPosition(uint32_t dstnode = 0xffffffff, uint16_t chan = 256) {
         sendPositionMessage(my_position, dstnode, chan);
