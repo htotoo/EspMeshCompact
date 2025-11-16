@@ -1,6 +1,6 @@
 {
-    "name": "EspMeshtCompact",
-    "keywords": "meshtastic, meshcore,esp32s3, lora",
+    "name": "EspMeshCompact",
+    "keywords": "meshtastic, meshcore, esp32s3, lora",
     "description": "Library for Mesh protocols (Meshtastic, MeshCore) ",
     "authors": {
         "name": "HTotoo",
