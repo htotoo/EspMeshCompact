@@ -343,6 +343,10 @@ void MtCompact::task_send(void* pvParameters) {
             // Send the packet
             {
                 std::unique_lock<std::mutex> lock(mshcomp->mtx_radio);
+                while (mshcomp->radio->scanChannel() != RADIOLIB_CHANNEL_FREE) {
+                    // channel busy, wait a bit
+                    vTaskDelay(20 / portTICK_PERIOD_MS);
+                }
                 ESP_LOGE(TAG, "Try send packet");
                 int err = mshcomp->radio->transmit(payload, total_len);
                 if (err == RADIOLIB_ERR_NONE) {
