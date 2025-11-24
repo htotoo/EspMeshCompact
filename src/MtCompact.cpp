@@ -998,7 +998,7 @@ void MtCompact::send_ack(MCT_Header& header) {
     MCT_OutQueueEntry entry;
     entry.header.dstnode = header.srcnode;  // Send ACK to the source node
     entry.header.srcnode = my_nodeinfo.node_id;
-    entry.header.packet_id = header.packet_id;  // Use the same packet ID for ACK
+    entry.header.packet_id = 0;
     entry.header.hop_limit = send_hop_limit;
     entry.header.want_ack = 0;
     entry.header.via_mqtt = false;
