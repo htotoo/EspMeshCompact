@@ -444,7 +444,7 @@ void MtCompact::intOnPositionMessage(MCT_Header& header, meshtastic_Position& po
     }
     if (want_reply && is_auto_full_node && is_send_enabled && isForMe) {
         ESP_LOGI(TAG, "AUTO Sending my pos info to node 0x%08" PRIx32, header.srcnode);
-        sendMyPosition(header.srcnode);
+        sendMyPosition(header.srcnode, header.chan_hash);
     }
 }
 
@@ -471,7 +471,7 @@ void MtCompact::intOnNodeInfo(MCT_Header& header, meshtastic_User& user_msg, boo
     }
     if (want_reply && is_auto_full_node && is_send_enabled && wasForMe) {
         ESP_LOGI(TAG, "AUTO Sending my node info to node 0x%08" PRIx32, header.srcnode);
-        sendMyNodeInfo(header.srcnode);
+        sendMyNodeInfo(header.srcnode, false, header.chan_hash);
     }
 }
 void MtCompact::intOnWaypointMessage(MCT_Header& header, meshtastic_Waypoint& waypoint_msg) {
@@ -1088,7 +1088,7 @@ void MtCompact::sendTraceroute(uint32_t dest_node_id, uint16_t chan, uint32_t se
     out_queue.push(entry);
 }
 
-void MtCompact::sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode, bool exchange) {
+void MtCompact::sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode, bool exchange, uint16_t chan) {
     if (!is_send_enabled) return;
     MCT_OutQueueEntry entry;
     entry.header.dstnode = dstnode;
@@ -1098,9 +1098,9 @@ void MtCompact::sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode, bool exch
     entry.header.want_ack = 0;
     entry.header.via_mqtt = false;
     entry.header.hop_start = send_hop_limit;
-    entry.header.chan_hash = pri_chan_hash;  // Use default channel hash
-    entry.header.via_mqtt = 0;               // Not used in this case
-    entry.encType = 1;                       // AES encryption
+    entry.header.chan_hash = chan >= 256 ? pri_chan_hash : (uint8_t)chan;
+    entry.header.via_mqtt = 0;  // Not used in this case
+    entry.encType = 1;          // AES encryption
     meshtastic_User user_msg = {};
     memcpy(user_msg.id, nodeinfo.id, sizeof(user_msg.id));
     memcpy(user_msg.short_name, nodeinfo.short_name, sizeof(user_msg.short_name));

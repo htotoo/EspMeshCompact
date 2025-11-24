@@ -131,9 +131,9 @@ class MtCompact {
      * @param dstnode Destination node ID. 0xffffffff = broadcast
      * @param exchange Whether to exchange node information (i.e., request a reply)
      */
-    void sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode = 0xffffffff, bool exchange = false);
-    void sendMyNodeInfo(uint32_t dstnode = 0xffffffff, bool exchange = false) {
-        sendNodeInfo(my_nodeinfo, dstnode, exchange);
+    void sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode = 0xffffffff, bool exchange = false, uint16_t chan = 256);
+    void sendMyNodeInfo(uint32_t dstnode = 0xffffffff, bool exchange = false, uint16_t chan = 256) {
+        sendNodeInfo(my_nodeinfo, dstnode, exchange, chan);
     }
     /**
      * @brief Send a text message
