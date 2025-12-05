@@ -84,6 +84,7 @@ bool MtCompact::setRadioFrequency(float freq) {
     {
         std::lock_guard<std::mutex> lock(mtx_radio);
         state = radio->setFrequency(freq);
+        // if LR1121, also set the output power again here. todo store it, and set it again.
     }
     return (state == RADIOLIB_ERR_NONE);
 }
@@ -102,6 +103,9 @@ bool MtCompact::setRadioSpreadingFactor(uint8_t sf) {
                 break;
             case RadioType::SX1276:
                 state = ((SX1276*)radio)->setSpreadingFactor(sf);
+                break;
+            case RadioType::LR1121:
+                state = ((LR1121*)radio)->setSpreadingFactor(sf);
                 break;
             default:
                 state = RADIOLIB_ERR_UNKNOWN;
@@ -127,6 +131,9 @@ bool MtCompact::setRadioBandwidth(uint32_t bw) {
             case RadioType::SX1276:
                 state = ((SX1276*)radio)->setBandwidth(bw);
                 break;
+            case RadioType::LR1121:
+                state = ((LR1121*)radio)->setBandwidth(bw);
+                break;
             default:
                 state = RADIOLIB_ERR_UNKNOWN;
                 break;
@@ -149,6 +156,9 @@ bool MtCompact::setRadioCodingRate(uint8_t cr) {
                 break;
             case RadioType::SX1276:
                 state = ((SX1276*)radio)->setCodingRate(cr);
+                break;
+            case RadioType::LR1121:
+                state = ((LR1121*)radio)->setCodingRate(cr);
                 break;
             default:
                 state = RADIOLIB_ERR_UNKNOWN;
@@ -195,6 +205,11 @@ bool MtCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConf
             radio = new SX1276(new Module(hal, radio_pins.cs, radio_pins.irq, radio_pins.rst, radio_pins.gpio));
             state = ((SX1276*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, 5);
             break;
+        case RadioType::LR1121:
+            ESP_LOGI(TAG, "Using LR1121 radio");
+            radio = new LR1121(new Module(hal, radio_pins.cs, radio_pins.irq, radio_pins.rst, radio_pins.gpio));
+            state = ((LR1121*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, lora_config.tcxo_voltage);
+            break;
         default:
             ESP_LOGW(TAG, "Unsupported radio type, let's try: SX1262");
             radio = new SX1262(new Module(hal, radio_pins.cs, radio_pins.irq, radio_pins.rst, radio_pins.gpio));
@@ -238,6 +253,29 @@ bool MtCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConf
             ((SX1276*)radio)->setDio1Action(onPacketReceived, 1);
             // state |= ((SX1276*)radio)->setRxBoostedGainMode(true);
             break;
+        case RadioType::LR1121: {
+            static const uint32_t rfswitch_dio_pins[] = {
+                RADIOLIB_LR11X0_DIO5, RADIOLIB_LR11X0_DIO6,
+                RADIOLIB_NC, RADIOLIB_NC, RADIOLIB_NC};
+            static const Module::RfSwitchMode_t rfswitch_table[] = {
+                // mode                  DIO5  DIO6
+                {LR11x0::MODE_STBY, {LOW, LOW}},
+                {LR11x0::MODE_RX, {LOW, HIGH}},
+                {LR11x0::MODE_TX, {HIGH, LOW}},
+                {LR11x0::MODE_TX_HP, {HIGH, LOW}},
+                {LR11x0::MODE_TX_HF, {LOW, LOW}},
+                {LR11x0::MODE_GNSS, {LOW, LOW}},
+                {LR11x0::MODE_WIFI, {LOW, LOW}},
+                END_OF_MODE_TABLE,
+            };
+            ((LR1121*)radio)->setRfSwitchTable(rfswitch_dio_pins, rfswitch_table);
+            state |= ((LR1121*)radio)->explicitHeader();
+            state |= ((LR1121*)radio)->setCRC(2);
+            state |= ((LR1121*)radio)->setRegulatorDCDC();
+            state |= ((LR1121*)radio)->setRxBoostedGainMode(true);
+            ((LR1121*)radio)->setPacketReceivedAction(onPacketReceived);
+            break;
+        }
         default:
         case RadioType::SX1262:
             state |= ((SX1262*)radio)->setCurrentLimit(130.0);
