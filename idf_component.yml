@@ -1,4 +1,5 @@
 version: "0.8.0"
+name: "EspMeshCompact"
 description: "Mesh library (MT,MC)"
 url: "https://github.com/htotoo/EspMeshCompact"
 repository: "https://github.com/htotoo/EspMeshCompact"
