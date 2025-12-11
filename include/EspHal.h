@@ -266,19 +266,6 @@ class EspHal : public RadioLibHal {
         spi_device_acquire_bus(SpiHandle, portMAX_DELAY);
     }
 
-    uint8_t spiTransferByte(uint8_t b) {
-        spi_transaction_t SPITransaction;
-        uint8_t in = 0;
-        memset(&SPITransaction, 0, sizeof(spi_transaction_t));
-        SPITransaction.length = 8;
-        SPITransaction.tx_buffer = &b;
-        SPITransaction.rx_buffer = &in;
-        if (spi_device_transmit(SpiHandle, &SPITransaction) == ESP_OK) {
-            return in;
-        }
-        return 0;
-    }
-
     void spiTransfer(uint8_t* out, size_t len, uint8_t* in) {
         esp_err_t ret;
         spi_transaction_t t;
@@ -291,14 +278,25 @@ class EspHal : public RadioLibHal {
         t.length = len * 8;        // Length is in bits, not bytes
         t.tx_buffer = out;         // Data to send
         t.rx_buffer = in;          // Buffer to receive into
-
-        // Use the polling (blocking) transmit function.
-        // This is the most stable method and avoids internal queueing bugs.
-        ret = spi_device_polling_transmit(SpiHandle, &t);
-
-        ESP_ERROR_CHECK(ret);  // Should never fail when used correctly
+        // Use the blocking transmit (non-polling).
+        // This respects the lock and waits for the Display DMA to finish.
+        ret = spi_device_transmit(SpiHandle, &t);
+        ESP_ERROR_CHECK(ret);
     }
 
+    uint8_t spiTransferByte(uint8_t b) {
+        spi_transaction_t SPITransaction;
+        uint8_t in = 0;
+        memset(&SPITransaction, 0, sizeof(spi_transaction_t));
+        SPITransaction.length = 8;
+        SPITransaction.tx_buffer = &b;
+        SPITransaction.rx_buffer = &in;
+        // Use spi_device_transmit here too
+        if (spi_device_transmit(SpiHandle, &SPITransaction) == ESP_OK) {
+            return in;
+        }
+        return 0;
+    }
     void spiEndTransaction() {
         // nothing needs to be done here
         spi_device_release_bus(SpiHandle);
