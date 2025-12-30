@@ -925,7 +925,7 @@ int16_t MtCompact::processPacket(uint8_t* data, int len, MtCompact* mshcomp) {
                 }
             }
             if (header.want_ack && is_send_enabled && !is_in_stealth_mode && header.dstnode == my_nodeinfo.node_id) {
-                send_ack(header);
+                // send_ack(header); //todo fix this
             }
         }
         pb_release(&meshtastic_Data_msg, &decodedtmp);

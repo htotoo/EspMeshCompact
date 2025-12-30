@@ -35,8 +35,12 @@ void MtCompactHelpers::NodeInfoBuilder(MCT_NodeInfo* nodeinfo, uint32_t node_id,
 void MtCompactHelpers::PositionBuilder(MCT_Position& position, float latitude, float longitude, int32_t altitude, uint32_t speed, uint32_t sats_in_view) {
     position.latitude_i = static_cast<int32_t>(latitude * 10e6);
     position.longitude_i = static_cast<int32_t>(longitude * 10e6);
+    position.has_latitude_i = true;
+    position.has_longitude_i = true;
+    position.has_altitude = (altitude != 0);
     position.altitude = altitude;
     position.ground_speed = speed;
+    position.has_ground_speed = (speed != 0);
     position.sats_in_view = sats_in_view;
     position.location_source = 0;
 }
