@@ -23,5 +23,12 @@ This is a **proof-of-concept (POC)** compact Meshtastic + MeshCore component for
 
 This project is for **POC and educational purposes only**. Use at your own risk.
 
+## Examples
+
+This lib is used in some projects, so those are for usage examples.
+- https://github.com/htotoo/meshbaba - a simple Mesh notificator, and Ping responder.
+- https://github.com/htotoo/DarkMesh - a complex app that can abuse the MT's weak points for demonstration.
+- https://github.com/htotoo/TPagerMesh - a work in progress / abandoned T-Pager FW using this lib for communication.
+
 ## WIP
 This project is under active development and subject to change. Many features are incomplete or not yet implemented. Contributions and pull requests are welcome!
