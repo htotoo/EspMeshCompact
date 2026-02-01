@@ -56,6 +56,9 @@ bool McCompact::setRadioSpreadingFactor(uint8_t sf) {
             case RadioType::SX1268:
                 state = ((SX126x*)radio)->setSpreadingFactor(sf);
                 break;
+            case RadioType::SX1278:
+                state = ((SX1278*)radio)->setSpreadingFactor(sf);
+                break;
             case RadioType::SX1276:
                 state = ((SX1276*)radio)->setSpreadingFactor(sf);
                 break;
@@ -86,6 +89,9 @@ bool McCompact::setRadioBandwidth(uint32_t bw) {
             case RadioType::SX1276:
                 state = ((SX1276*)radio)->setBandwidth(bw);
                 break;
+            case RadioType::SX1278:
+                state = ((SX1278*)radio)->setBandwidth(bw);
+                break;
             case RadioType::LR1121:
                 state = ((LR1121*)radio)->setBandwidth(bw);
                 break;
@@ -112,6 +118,10 @@ bool McCompact::setRadioCodingRate(uint8_t cr) {
             case RadioType::SX1276:
                 state = ((SX1276*)radio)->setCodingRate(cr);
                 break;
+            case RadioType::SX1278:
+                state = ((SX1278*)radio)->setCodingRate(cr);
+                break;
+
             case RadioType::LR1121:
                 state = ((LR1121*)radio)->setCodingRate(cr);
                 break;
@@ -159,6 +169,11 @@ bool McCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConf
             ESP_LOGI(TAG, "Using SX1276 radio");
             radio = new SX1276(new Module(hal, radio_pins.cs, radio_pins.irq, radio_pins.rst, radio_pins.gpio));
             state = ((SX1276*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, 5);
+            break;
+        case RadioType::SX1278:
+            ESP_LOGI(TAG, "Using SX1278 radio");
+            radio = new SX1278(new Module(hal, radio_pins.cs, radio_pins.irq, radio_pins.rst, radio_pins.gpio));
+            state = ((SX1278*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, 5);
             break;
 
         case RadioType::LR1121:
@@ -208,6 +223,15 @@ bool McCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConf
             // state |= ((SX1276*)radio)->setDio2AsRfSwitch(false);
             ((SX1276*)radio)->setDio1Action(onPacketReceived, 1);
             // state |= ((SX1276*)radio)->setRxBoostedGainMode(true);
+            break;
+        case RadioType::SX1278:
+            // todo check
+            state |= ((SX1278*)radio)->setCurrentLimit(130.0);
+            state |= ((SX1278*)radio)->explicitHeader();
+            state |= ((SX1278*)radio)->setCRC(RADIOLIB_SX126X_LORA_CRC_ON);
+            // state |= ((SX1278*)radio)->setDio2AsRfSwitch(false);
+            ((SX1278*)radio)->setDio1Action(onPacketReceived, 1);
+            // state |= ((SX1278*)radio)->setRxBoostedGainMode(true);
             break;
         case RadioType::LR1121: {
             static const uint32_t rfswitch_dio_pins[] = {

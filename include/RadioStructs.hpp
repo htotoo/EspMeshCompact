@@ -6,7 +6,8 @@ enum class RadioType {
     SX1261,
     SX1268,
     SX1276,
-    LR1121
+    LR1121,
+    SX1278,
 };
 
 struct Radio_PINS {
