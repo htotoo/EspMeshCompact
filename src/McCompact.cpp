@@ -221,7 +221,7 @@ bool McCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConf
             state |= ((SX1276*)radio)->explicitHeader();
             state |= ((SX1276*)radio)->setCRC(RADIOLIB_SX126X_LORA_CRC_ON);
             // state |= ((SX1276*)radio)->setDio2AsRfSwitch(false);
-            ((SX1276*)radio)->setDio1Action(onPacketReceived, 1);
+            ((SX1276*)radio)->setDio0Action(onPacketReceived, 1);
             // state |= ((SX1276*)radio)->setRxBoostedGainMode(true);
             break;
         case RadioType::SX1278:
@@ -230,7 +230,7 @@ bool McCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConf
             state |= ((SX1278*)radio)->explicitHeader();
             state |= ((SX1278*)radio)->setCRC(RADIOLIB_SX126X_LORA_CRC_ON);
             // state |= ((SX1278*)radio)->setDio2AsRfSwitch(false);
-            ((SX1278*)radio)->setDio1Action(onPacketReceived, 1);
+            ((SX1278*)radio)->setDio0Action(onPacketReceived, 1);
             // state |= ((SX1278*)radio)->setRxBoostedGainMode(true);
             break;
         case RadioType::LR1121: {
