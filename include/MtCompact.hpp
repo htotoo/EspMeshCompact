@@ -183,6 +183,7 @@ class MtCompact {
             MtCompactHelpers::RegenerateOrGeneratePrivateKey(my_nodeinfo);
         } else {
             MtCompactHelpers::GeneratePrivateKey(my_nodeinfo);
+            MtCompactFileIO::savePrivateKey(my_nodeinfo);
         }
     }
 
