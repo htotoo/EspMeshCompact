@@ -374,6 +374,21 @@ void MtCompact::task_send(void* pvParameters) {
             else if (entry.encType == 2)
                 aesenc = false;  // key
 
+            // fix chan encoding, if chan hash is set; based on chan mgr
+            if (entry.header.chan_hash != 0) {
+                auto chan_info = mshcomp->chan_mgr.getChannelByHash(entry.header.chan_hash);
+                if (chan_info != nullptr) {
+                    entry.key = chan_info->secret;
+                    entry.key_len = chan_info->secret_len;
+                } else {
+                    entry.key = (uint8_t*)mshcomp->default_l1_key;
+                    entry.key_len = sizeof(mshcomp->default_l1_key);  // Use default
+                }
+            } else {
+                entry.key = (uint8_t*)mshcomp->default_l1_key;
+                entry.key_len = sizeof(mshcomp->default_l1_key);  // Use default
+            }
+
             if (!aesenc) {
                 // private message, encrypt with that method if pubkey is availeable
                 // todo length check for the +12
@@ -1073,8 +1088,6 @@ void MtCompact::send_ack(MCT_Header& header) {
     entry.encType = 1;
     entry.data.portnum = meshtastic_PortNum_ROUTING_APP;
     entry.data.want_response = 0;
-    entry.key = (uint8_t*)default_l1_key;
-    entry.key_len = sizeof(default_l1_key);
     meshtastic_Routing c = meshtastic_Routing_init_default;
     c.error_reason = meshtastic_Routing_Error_NONE;  // No error reason for ACK
     c.which_variant = meshtastic_Routing_error_reason_tag;
@@ -1122,8 +1135,6 @@ void MtCompact::sendTracerouteReply(MCT_Header& header, MCT_RouteDiscovery& rout
     memcpy(meshtastic_route_discovery.route_back, route_discovery.route_back, sizeof(meshtastic_route_discovery.route_back));
     memcpy(meshtastic_route_discovery.snr_back, route_discovery.snr_back, sizeof(meshtastic_route_discovery.snr_back));
     entry.data.payload.size = pb_encode_to_bytes(entry.data.payload.bytes, sizeof(entry.data.payload.bytes), &meshtastic_RouteDiscovery_msg, &meshtastic_route_discovery);
-    entry.key = (uint8_t*)default_l1_key;
-    entry.key_len = sizeof(default_l1_key);
     out_queue.push(entry);
 }
 
@@ -1149,8 +1160,6 @@ void MtCompact::sendTraceroute(uint32_t dest_node_id, uint16_t chan, uint32_t se
     if (ok_to_mqtt) entry.data.bitfield |= 1 << BITFIELD_OK_TO_MQTT_SHIFT;  // Set the MQTT upload bit
     entry.data.has_bitfield = true;
     entry.data.payload.size = pb_encode_to_bytes(entry.data.payload.bytes, sizeof(entry.data.payload.bytes), &meshtastic_RouteDiscovery_msg, &route_discovery_msg);
-    entry.key = (uint8_t*)default_l1_key;    // Use default channel key for encryption
-    entry.key_len = sizeof(default_l1_key);  // Use default channel key length
     out_queue.push(entry);
 }
 
@@ -1197,8 +1206,6 @@ void MtCompact::sendNodeInfo(MCT_NodeInfo& nodeinfo, uint32_t dstnode, bool exch
     entry.data.reply_id = 0;
     entry.data.want_response = exchange;
     entry.data.payload.size = pb_encode_to_bytes((uint8_t*)&entry.data.payload.bytes, sizeof(entry.data.payload.bytes), &meshtastic_User_msg, &user_msg);
-    entry.key = (uint8_t*)default_l1_key;    // Use default channel key for encryption
-    entry.key_len = sizeof(default_l1_key);  // Use default channel key length
     out_queue.push(entry);
 }
 
@@ -1240,15 +1247,6 @@ void MtCompact::sendTextMessage(const std::string& text, uint32_t dstnode, uint1
     entry.data.bitfield = 0;
     if (ok_to_mqtt) entry.data.bitfield |= 1 << BITFIELD_OK_TO_MQTT_SHIFT;  // Set the MQTT upload bit
     entry.data.has_bitfield = true;
-    // do i have this cahn in my db?
-    auto chan_info = chan_mgr.getChanInfo(chan);
-    if (chan_info != nullptr) {
-        entry.key = chan_info->secret;
-        entry.key_len = chan_info->secret_len;
-    } else {
-        entry.key = (uint8_t*)default_l1_key;
-        entry.key_len = sizeof(default_l1_key);  // Use default channel key for encryption
-    }
     out_queue.push(entry);
 }
 
@@ -1270,8 +1268,6 @@ void MtCompact::sendRequestPositionInfo(uint32_t dest_node_id, uint16_t chan, ui
     entry.data.bitfield = 0;
     if (ok_to_mqtt) entry.data.bitfield |= 1 << BITFIELD_OK_TO_MQTT_SHIFT;  // Set the MQTT upload bit
     entry.data.has_bitfield = true;
-    entry.key = (uint8_t*)default_l1_key;
-    entry.key_len = sizeof(default_l1_key);  // Use default channel key for encryption
     meshtastic_Position position_msg = {};
     entry.data.payload.size = pb_encode_to_bytes((uint8_t*)&entry.data.payload.bytes, sizeof(entry.data.payload.bytes), &meshtastic_Position_msg, &position_msg);
     out_queue.push(entry);
@@ -1295,8 +1291,6 @@ void MtCompact::sendPositionMessage(MCT_Position& position, uint32_t dstnode, ui
     if (ok_to_mqtt) entry.data.bitfield |= 1 << BITFIELD_OK_TO_MQTT_SHIFT;  // Set the MQTT upload bit
     entry.data.has_bitfield = true;
     entry.data.want_response = 0;
-    entry.key = (uint8_t*)default_l1_key;
-    entry.key_len = sizeof(default_l1_key);  // Use default channel key for encryption
     meshtastic_Position position_msg = {};
 
     position_msg.latitude_i = position.latitude_i;
@@ -1333,8 +1327,6 @@ void MtCompact::sendWaypointMessage(MCT_Waypoint& waypoint, uint32_t dstnode, ui
     entry.data.bitfield = 0;
     if (ok_to_mqtt) entry.data.bitfield |= 1 << BITFIELD_OK_TO_MQTT_SHIFT;  // Set the MQTT upload bit
     entry.data.has_bitfield = true;
-    entry.key = (uint8_t*)default_l1_key;
-    entry.key_len = sizeof(default_l1_key);  // Use default channel key for encryption
     meshtastic_Waypoint waypoint_msg = {};
 
     waypoint_msg.latitude_i = waypoint.latitude_i;
@@ -1363,8 +1355,6 @@ void MtCompact::sendTelemetryDevice(MCT_Telemetry_Device& telemetry, uint32_t ds
     entry.encType = 1;
     entry.data.portnum = meshtastic_PortNum_TELEMETRY_APP;
     entry.data.want_response = 0;
-    entry.key = (uint8_t*)default_l1_key;
-    entry.key_len = sizeof(default_l1_key);
     meshtastic_Telemetry telemetry_msg = {};
 
     telemetry_msg.time = (uint32_t)time(NULL);
@@ -1399,8 +1389,6 @@ void MtCompact::sendTelemetryEnvironment(MCT_Telemetry_Environment& telemetry, u
     entry.encType = 1;
     entry.data.portnum = meshtastic_PortNum_TELEMETRY_APP;
     entry.data.want_response = 0;
-    entry.key = (uint8_t*)default_l1_key;
-    entry.key_len = sizeof(default_l1_key);
     meshtastic_Telemetry telemetry_msg = {};
 
     telemetry_msg.time = (uint32_t)time(NULL);
