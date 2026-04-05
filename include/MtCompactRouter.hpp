@@ -5,7 +5,7 @@
 
 class MtCompactRouter {
    public:
-    static constexpr size_t MAX_ENTRIES = 20;
+    static constexpr size_t MAX_ENTRIES = 50;
 
     struct Entry {
         uint32_t src;

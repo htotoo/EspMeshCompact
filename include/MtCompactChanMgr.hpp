@@ -29,5 +29,14 @@ class MtCompatChanMgr {
         return nullptr;
     }
 
+    MTC_ChannelEntry* getChannelByHash(uint8_t hash) {
+        for (auto& ch : channels) {
+            if (ch.hash[0] == hash) {
+                return &ch;
+            }
+        }
+        return nullptr;
+    }
+
     std::vector<MTC_ChannelEntry> channels;
 };
