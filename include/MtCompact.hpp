@@ -23,7 +23,6 @@
 #include "MtCompactFileIO.hpp"
 #include "MtCompactHelpers.hpp"
 #include "MtCompactChanMgr.hpp"
-#include "MtDeduplicator.hpp"
 #include "AES.h"
 
 class MtCompact {
