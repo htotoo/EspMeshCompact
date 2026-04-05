@@ -23,6 +23,7 @@
 #include "MtCompactFileIO.hpp"
 #include "MtCompactHelpers.hpp"
 #include "MtCompactChanMgr.hpp"
+#include "MtDeduplicator.hpp"
 #include "AES.h"
 
 class MtCompact {
@@ -186,6 +187,15 @@ class MtCompact {
             MtCompactFileIO::savePrivateKey(my_nodeinfo);
         }
     }
+    /**
+     * @brief Set the Deduplicator Enabled. If enabled, messages will be received only once (mostly, if the old id is still in the cache)
+     *
+     * @param enabled Default true
+     */
+
+    void setDedupeEnabled(bool enabled) {
+        dedupe_enabled = enabled;
+    }
 
     void printKeysHex();  // prints the private and public keys in hex format for debugging
 
@@ -258,6 +268,10 @@ class MtCompact {
     bool debugmode = false;  // if true, enables debug logging
 
     MeshCompactOutQueue out_queue;  // Outgoing queue for packets to be sent.
+
+    bool dedupe_enabled = true;    // whether to enable deduplication. You can disable it if you want to process every single message, even duplicates. Not recommended.
+    MtDeduplicator dedupe_msg;     // Deduplicator for message IDs to prevent processing the same message multiple times.
+    MtDeduplicator dedupe_others;  // Deduplicator for other IDs (e.g., node info) to prevent processing the same info multiple times.
 
     // Callback function pointers
     OnMessageCallback onMessage = nullptr;  // Function pointer for onMessage callback
