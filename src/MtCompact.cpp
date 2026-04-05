@@ -493,7 +493,7 @@ bool MtCompact::radioSendInit() {
 void MtCompact::intOnMessage(MCT_Header& header, MCT_TextMessage& message) {
     // we won't cache, it is the upper layer's thing.
     if (dedupe_enabled) {
-        if (!dedupe_msg.check(header.packet_id)) return;  // duplicate message, ignore
+        if (dedupe_msg.check(header.packet_id)) return;  // duplicate message, ignore
     }
     if (onMessage) {
         onMessage(header, message);
@@ -502,7 +502,7 @@ void MtCompact::intOnMessage(MCT_Header& header, MCT_TextMessage& message) {
 
 void MtCompact::intOnPositionMessage(MCT_Header& header, meshtastic_Position& position_msg, bool want_reply) {
     if (dedupe_enabled) {
-        if (!dedupe_others.check(header.packet_id)) return;  // duplicate message, ignore
+        if (dedupe_others.check(header.packet_id)) return;  // duplicate message, ignore
     }
     MCT_Position position = {.latitude_i = position_msg.latitude_i, .longitude_i = position_msg.longitude_i, .altitude = position_msg.altitude, .ground_speed = position_msg.ground_speed, .sats_in_view = position_msg.sats_in_view, .location_source = (uint8_t)position_msg.location_source, .has_latitude_i = position_msg.has_latitude_i, .has_longitude_i = position_msg.has_longitude_i, .has_altitude = position_msg.has_altitude, .has_ground_speed = position_msg.has_ground_speed};
     if (position.has_latitude_i && position.has_longitude_i) nodeinfo_db.setPosition(header.srcnode, position);  // not saved the request, since that is mostly empty
@@ -522,7 +522,7 @@ void MtCompact::intOnPositionMessage(MCT_Header& header, meshtastic_Position& po
 
 void MtCompact::intOnNodeInfo(MCT_Header& header, meshtastic_User& user_msg, bool want_reply) {
     if (dedupe_enabled) {
-        if (!dedupe_others.check(header.packet_id)) return;  // duplicate message, ignore
+        if (dedupe_others.check(header.packet_id)) return;  // duplicate message, ignore
     }
     MCT_NodeInfo node_info;
     node_info.node_id = header.srcnode;  // srcnode is the node ID
@@ -551,7 +551,7 @@ void MtCompact::intOnNodeInfo(MCT_Header& header, meshtastic_User& user_msg, boo
 }
 void MtCompact::intOnWaypointMessage(MCT_Header& header, meshtastic_Waypoint& waypoint_msg) {
     if (dedupe_enabled) {
-        if (!dedupe_others.check(header.packet_id)) return;  // duplicate message, ignore
+        if (dedupe_others.check(header.packet_id)) return;  // duplicate message, ignore
     }
     MCT_Waypoint waypoint;
     waypoint.latitude_i = waypoint_msg.latitude_i;
@@ -574,7 +574,7 @@ void MtCompact::intOnWaypointMessage(MCT_Header& header, meshtastic_Waypoint& wa
 
 void MtCompact::intOnTelemetryDevice(MCT_Header& header, _meshtastic_Telemetry& telemetry_msg) {
     if (dedupe_enabled) {
-        if (!dedupe_others.check(header.packet_id)) return;  // duplicate message, ignore
+        if (dedupe_others.check(header.packet_id)) return;  // duplicate message, ignore
     }
     MCT_Telemetry_Device device_metrics;
     device_metrics.battery_level = telemetry_msg.variant.device_metrics.battery_level;
@@ -595,7 +595,7 @@ void MtCompact::intOnTelemetryDevice(MCT_Header& header, _meshtastic_Telemetry& 
 
 void MtCompact::intOnTelemetryEnvironment(MCT_Header& header, _meshtastic_Telemetry& telemetry_msg) {
     if (dedupe_enabled) {
-        if (!dedupe_others.check(header.packet_id)) return;  // duplicate message, ignore
+        if (dedupe_others.check(header.packet_id)) return;  // duplicate message, ignore
     }
     MCT_Telemetry_Environment environment_metrics;
     environment_metrics.temperature = telemetry_msg.variant.environment_metrics.temperature;
