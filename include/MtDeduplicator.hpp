@@ -1,7 +1,10 @@
 #ifndef MTDEDUPLICATOR_HPP
 #define MTDEDUPLICATOR_HPP
 
-#include <stdint>
+#include <stdint.h>
+#include <unordered_set>
+#include <deque>
+#include <mutex>
 
 class MtDeduplicator {
    public:
