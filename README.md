@@ -1,4 +1,4 @@
-# Meshtastic ESP32S3 Compact Component
+# Mesh ESP32S3 Compact Component
 
 This is a **proof-of-concept (POC)** compact Meshtastic + MeshCore component for the ESP32S3.
 
