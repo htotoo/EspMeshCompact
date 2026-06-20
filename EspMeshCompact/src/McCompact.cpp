@@ -580,6 +580,10 @@ I (106019) McCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg_len=2
         }
         return 0;
     }
+    if (plt == MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_CONTROL) {
+        if (debugmode) ESP_LOGI(TAG, "PAYLOAD_TYPE_CONTROL NIY");
+        return 0;
+    }
     return 0;
 }
 

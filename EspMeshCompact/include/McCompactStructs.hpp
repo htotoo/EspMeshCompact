@@ -26,6 +26,7 @@ enum class MCC_PAYLOAD_TYPE : uint8_t {
     PAYLOAD_TYPE_PATH = 0x08,
     PAYLOAD_TYPE_TRACE = 0x09,
     PAYLOAD_TYPE_MULTIPART = 0x0A,
+    PAYLOAD_TYPE_CONTROL = 0x0B,
     PAYLOAD_TYPE_RAW_CUSTOM = 0x0F
 };
 
@@ -102,6 +103,8 @@ class MCC_Header {
                 return "TRACE";
             case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_MULTIPART:
                 return "MULTIPART";
+            case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_CONTROL:
+                return "CONTROL";
             case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_RAW_CUSTOM:
                 return "RAW_CUSTOM";
             default:
