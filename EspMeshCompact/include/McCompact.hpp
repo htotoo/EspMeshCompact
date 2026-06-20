@@ -64,6 +64,11 @@ class McCompact {
     static int MACThenDecrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len);
     static int secure_memcmp(const void* a, const void* b, size_t size);
 
+    // To enable or disable this module's logging to serial
+    void setDebugMode(bool enabled) {
+        debugmode = enabled;
+    }
+
    private:
     RadioType radio_type;
     bool RadioListen();    // inits the listening thread for the radio
@@ -86,6 +91,8 @@ class McCompact {
 
     mutable std::mutex mtx_radio;
     bool need_run = true;  // thread exit flag
+
+    bool debugmode = false;  // if true, enables debug logging
 
     OnRaw onRaw = nullptr;
     OnNodeInfo onNodeInfo = nullptr;

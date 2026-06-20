@@ -30,7 +30,7 @@ extern "C" void app_main(void) {
         ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
     }
-
+    mesh.setDebugMode(true);  // Enable debug logging
     mesh.RadioInit(RadioType::SX1262, radio_pins, lora_config_mc);
     mesh.chan_mgr.addChannel("TTest", "38c42a7bf8c329d8e7759ac8b1f83d96");
     mesh.setOnNodeInfo([](const MCC_Nodeinfo& info) {

@@ -146,50 +146,50 @@ bool McCompact::setRadioPower(int8_t power) {
 
 bool McCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConfig& lora_config) {
     this->radio_type = radio_type;
-    ESP_LOGI(TAG, "RadioInit");
+    if (debugmode) ESP_LOGI(TAG, "RadioInit");
     hal = new EspHal(radio_pins.sck, radio_pins.miso, radio_pins.mosi, radio_pins.cs);
     int state = RADIOLIB_ERR_NONE;
     switch (radio_type) {
         case RadioType::SX1262:
-            ESP_LOGI(TAG, "Using SX1262 radio");
+            if (debugmode) ESP_LOGI(TAG, "Using SX1262 radio");
             radio = new SX1262(new Module(hal, radio_pins.cs, radio_pins.irq, radio_pins.rst, radio_pins.gpio));
             state = ((SX1262*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, lora_config.tcxo_voltage, lora_config.use_regulator_ldo);
             break;
         case RadioType::SX1261:
-            ESP_LOGI(TAG, "Using SX1261 radio");
+            if (debugmode) ESP_LOGI(TAG, "Using SX1261 radio");
             radio = new SX1261(new Module(hal, radio_pins.cs, radio_pins.irq, radio_pins.rst, radio_pins.gpio));
             state = ((SX1261*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, lora_config.tcxo_voltage, lora_config.use_regulator_ldo);
             break;
         case RadioType::SX1268:
-            ESP_LOGI(TAG, "Using SX1268 radio");
+            if (debugmode) ESP_LOGI(TAG, "Using SX1268 radio");
             radio = new SX1268(new Module(hal, radio_pins.cs, radio_pins.irq, radio_pins.rst, radio_pins.gpio));
             state = ((SX1268*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, lora_config.tcxo_voltage, lora_config.use_regulator_ldo);
             break;
         case RadioType::SX1276:
-            ESP_LOGI(TAG, "Using SX1276 radio");
+            if (debugmode) ESP_LOGI(TAG, "Using SX1276 radio");
             radio = new SX1276(new Module(hal, radio_pins.cs, radio_pins.irq, radio_pins.rst, radio_pins.gpio));
             state = ((SX1276*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, 5);
             break;
         case RadioType::SX1278:
-            ESP_LOGI(TAG, "Using SX1278 radio");
+            if (debugmode) ESP_LOGI(TAG, "Using SX1278 radio");
             radio = new SX1278(new Module(hal, radio_pins.cs, radio_pins.irq, radio_pins.rst, radio_pins.gpio));
             state = ((SX1278*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, 5);
             break;
 
         case RadioType::LR1121:
-            ESP_LOGI(TAG, "Using LR1121 radio");
+            if (debugmode) ESP_LOGI(TAG, "Using LR1121 radio");
             radio = new LR1121(new Module(hal, radio_pins.cs, radio_pins.irq, radio_pins.rst, radio_pins.gpio));
             state = ((LR1121*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, lora_config.tcxo_voltage);
             break;
         default:
-            ESP_LOGW(TAG, "Unsupported radio type, let's try: SX1262");
+            if (debugmode) ESP_LOGW(TAG, "Unsupported radio type, let's try: SX1262");
             radio = new SX1262(new Module(hal, radio_pins.cs, radio_pins.irq, radio_pins.rst, radio_pins.gpio));
             state = ((SX1262*)radio)->begin(lora_config.frequency, lora_config.bandwidth, lora_config.spreading_factor, lora_config.coding_rate, lora_config.sync_word, lora_config.output_power, lora_config.preamble_length, lora_config.tcxo_voltage, lora_config.use_regulator_ldo);
             return false;
     }
 
     if (state != RADIOLIB_ERR_NONE) {
-        ESP_LOGE(TAG, "failed, code %d\n", state);
+        if (debugmode) ESP_LOGE(TAG, "failed, code %d\n", state);
         delete hal;
         delete radio;
         hal = nullptr;
@@ -384,7 +384,7 @@ void McCompact::task_send(void* pvParameters) {
 
 void McCompact::task_listen(void* pvParameters) {
     McCompact* mshcomp = static_cast<McCompact*>(pvParameters);
-    ESP_LOGI(pcTaskGetName(NULL), "Start");
+    if (mshcomp->debugmode) ESP_LOGI(pcTaskGetName(NULL), "Start");
     uint8_t rxData[256];  // Maximum Payload size of SX1261/62/68 is 255
     mshcomp->radio->startReceive();
     while (mshcomp->need_run) {
@@ -395,7 +395,7 @@ void McCompact::task_listen(void* pvParameters) {
             int rxLen = 0;
             {
                 std::unique_lock<std::mutex> lock(mshcomp->mtx_radio);
-                // ESP_LOGW(TAG, "Packet received, trying to read data");
+                // if (mshcomp->debugmode) ESP_LOGW(TAG, "Packet received, trying to read data");
                 rxLen = mshcomp->radio->getPacketLength();
                 if (rxLen > 255) rxLen = 255;  // Ensure we do not overflow the buffer
                 err = mshcomp->radio->readData(rxData, rxLen);
@@ -446,12 +446,12 @@ void McCompact::intOnNodeInfo(MCC_Nodeinfo& nodeinfo) {
     if (onNodeInfo) {
         onNodeInfo(nodeinfo);
     }
-    ESP_LOGI(TAG, "timestamp=%lu, flags=0x%02x", nodeinfo.timestamp, nodeinfo.flags);
+    if (debugmode) ESP_LOGI(TAG, "timestamp=%lu, flags=0x%02x", nodeinfo.timestamp, nodeinfo.flags);
     if (nodeinfo.flags & (uint8_t)MCC_NODEINFO_FLAGS::HAS_LOCATION) {
-        ESP_LOGI(TAG, ", latitude_i=%lu, longitude_i=%lu", nodeinfo.latitude_i, nodeinfo.longitude_i);
+        if (debugmode) ESP_LOGI(TAG, ", latitude_i=%lu, longitude_i=%lu", nodeinfo.latitude_i, nodeinfo.longitude_i);
     }
     if (nodeinfo.flags & (uint8_t)MCC_NODEINFO_FLAGS::HAS_NAME) {
-        ESP_LOGI(TAG, ", name=%s", nodeinfo.name.c_str());
+        if (debugmode) ESP_LOGI(TAG, ", name=%s", nodeinfo.name.c_str());
     }
 }
 
@@ -459,13 +459,16 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
     MCC_Header header;
     size_t pos = header.parse(data, len);
     if (pos == 0) {
-        ESP_LOGE(TAG, "Failed to parse MCC header");
+        if (debugmode) ESP_LOGE(TAG, "Failed to parse MCC header");
         return -1;
     }
-    ESP_LOGI(TAG, "Received packet: route_type=%d, payload_type=%d, addr_format=%d, transport_codes=0x%08" PRIx32 ", path_length=%zu", (uint8_t)header.get_route_type(), (uint8_t)header.get_payload_type(), (uint8_t)header.get_addr_format(), header.transport_codes, header.path.size());
-    ESP_LOGI(TAG, "Path: ");
-    for (const auto& hop : header.path) {
-        ESP_LOGI(TAG, "  Hop: %ud", hop);
+    if (debugmode) ESP_LOGI(TAG, "Received packet: route_type=%d, payload_type=%d, addr_format=%d, transport_codes=0x%08" PRIx32 ", path_length=%zu", (uint8_t)header.get_route_type(), (uint8_t)header.get_payload_type(), (uint8_t)header.get_addr_format(), header.transport_codes, header.path.size());
+    if (debugmode) {
+        printf("%s: Path: ", TAG);  // Print the tag and header once
+        for (const auto& hop : header.path) {
+            printf(" %lX", hop);  // Print each hop in hex format
+        }
+        printf("\n");  // Add a single newline at the end
     }
     MCC_PAYLOAD_TYPE plt = header.get_payload_type();
 
@@ -481,7 +484,7 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
         uint32_t crc = 0;
         if (len >= pos + 4) {
             crc = *((uint32_t*)&data[pos]);
-            ESP_LOGI(TAG, "ACK for CRC=0x%08" PRIx32, crc);
+            if (debugmode) ESP_LOGI(TAG, "ACK for CRC=0x%08" PRIx32, crc);
             return 1;
         }
     }
@@ -495,16 +498,16 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
         uint8_t secret[PUB_KEY_SIZE] = {0};  // 32 bytes
         int lenn = MACThenDecrypt(secret, datadec, macanddata, len - pos);
         if (lenn > 0) {
-            ESP_LOGI(TAG, "Decrypted payload length: %d", lenn);
+            if (debugmode) ESP_LOGI(TAG, "Decrypted payload length: %d", lenn);
             ESP_LOGI(TAG, "Decrypted payload: %s", datadec);
 
         } else {
-            ESP_LOGE(TAG, "Failed to decrypt payload %d", lenn);
+            if (debugmode) ESP_LOGE(TAG, "Failed to decrypt payload %d", lenn);
             return 0;
         }
         pos = 0;  // inner pos
         if (plt == MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_PATH) {
-            ESP_LOGI(TAG, "PATH packet:NIY");
+            if (debugmode) ESP_LOGI(TAG, "PATH packet:NIY");
             return 0;
         }
         if (plt == MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_REQ) {
@@ -512,14 +515,14 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
             uint32_t timestamp = *((uint32_t*)&datadec[pos]);
             pos += 4;
             uint8_t request_type = datadec[pos++];
-            ESP_LOGI(TAG, "REQ packet:NIY");
+            if (debugmode) ESP_LOGI(TAG, "REQ packet:NIY");
             return 0;
         }
         if (plt == MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_RESPONSE) {
             // timestamp 4 byte
             uint32_t tag = *((uint32_t*)&datadec[pos]);
             pos += 4;
-            ESP_LOGI(TAG, "RESP packet:NIY");
+            if (debugmode) ESP_LOGI(TAG, "RESP packet:NIY");
             return 0;
         }
         if (plt == MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_TXT_MSG) {
@@ -535,7 +538,7 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
             }
             uint16_t msg_len = len - pos;
             std::string msg = std::string((const char*)&datadec[pos], msg_len);
-            ESP_LOGI(TAG, "TXT_MSG packet: timestamp=%lu, flags=0x%02x, msg_len=%u, msg=%s", timestamp, msg_flags, msg_len, msg.c_str());
+            if (debugmode) ESP_LOGI(TAG, "TXT_MSG packet: timestamp=%lu, flags=0x%02x, msg_len=%u, msg=%s", timestamp, msg_flags, msg_len, msg.c_str());
             return 1;
             /*
             Received packet of length 38: 09 00 48 AC A0 13 C8 09 C2 36 BF F6 CC 78 B2 35 18 37 75 7D FC 9B 61 F2 0E 41 15 20 4B 52 C0 B2 55 DF 8A 8B E7 65
@@ -555,25 +558,25 @@ I (106019) McCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg_len=2
     }
 
     if (plt == MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_ANON_REQ) {
-        ESP_LOGI(TAG, "PAYLOAD_TYPE_ANON_REQ NIY");
+        if (debugmode) ESP_LOGI(TAG, "PAYLOAD_TYPE_ANON_REQ NIY");
         return 0;
     }
     if (plt == MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_GRP_TXT) {
-        ESP_LOGI(TAG, "PAYLOAD_TYPE_GRP_TXT");
+        if (debugmode) ESP_LOGI(TAG, "PAYLOAD_TYPE_GRP_TXT");
         uint8_t decoded[MAX_PACKET_PAYLOAD];
         size_t out_decoded_len = 0;
         auto chan = chan_mgr.getChannelByHashAndData(&data[pos], len - pos, decoded, out_decoded_len);
         if (out_decoded_len > 0 && chan) {
             // todo extract other data too
-            ESP_LOGI(TAG, "Decrypted group text length: %zu", out_decoded_len);
-            ESP_LOGI(TAG, "Decrypted group text: %s", decoded + 6);
+            if (debugmode) ESP_LOGI(TAG, "Decrypted group text length: %zu", out_decoded_len);
+            if (debugmode) ESP_LOGI(TAG, "Decrypted group text: %s", decoded + 6);
             if (onGroupMsg) {
                 size_t msglen = strnlen((const char*)(decoded + 6), out_decoded_len - 6);
                 std::string grpmsg = std::string((const char*)(decoded + 6), msglen);
                 onGroupMsg(*chan, grpmsg);
             }
         } else {
-            ESP_LOGE(TAG, "Failed to decrypt group text");
+            if (debugmode) ESP_LOGE(TAG, "Failed to decrypt group text");
         }
         return 0;
     }
@@ -649,6 +652,7 @@ int McCompact::encrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_
     // Return the total number of bytes written to the destination
     return dp - dest;
 };
+
 int McCompact::encryptThenMAC(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
     int enc_len = encrypt(shared_secret, dest + CIPHER_MAC_SIZE, src, src_len);
     const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
@@ -661,7 +665,7 @@ int McCompact::encryptThenMAC(const uint8_t* shared_secret, uint8_t* dest, const
         enc_len,                 // The length of the message
         dest                     // The destination for the 32-byte MAC output
     );
-    return 0;
+    return ret;
 };
 int McCompact::MACThenDecrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
     if (src_len <= CIPHER_MAC_SIZE) {

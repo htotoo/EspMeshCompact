@@ -78,17 +78,25 @@ class MCC_Header {
         } else {
             transport_codes = 0;
         }
-        uint8_t path_length = data[pos++];
-        path.resize(path_length);
-        // if (len < pos + path_length) return 0;
-        memcpy(path.data(), &data[pos], path_length);
-        pos += path_length;
+        uint8_t meta = data[pos++];
+        uint8_t path_size = ((meta >> 6) & 0x03) + 1;  // 1, 2, or 3 bytes per hop
+        uint8_t path_count = (meta & 0x3F);            // Number of hops
+        path.resize(path_count);
+        for (int i = 0; i < path_count; ++i) {
+            uint32_t current_hop = 0;
+            for (int b = 0; b < path_size; ++b) {
+                current_hop |= (uint32_t)data[pos++] << (8 * b);
+            }
+
+            path[i] = current_hop;
+        }
         return pos;
     }
 
     uint8_t header;
-    uint32_t transport_codes;   // optional 4 bytes
-    std::vector<uint8_t> path;  // it'll store path_len too
+    uint32_t transport_codes;    // optional 4 bytes
+    std::vector<uint32_t> path;  // it'll store path_len too
+    uint8_t path_size = 1;       // 1, 2, or 3 bytes per hop
 };
 
 class MCC_Nodeinfo {
