@@ -581,7 +581,30 @@ I (106019) McCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg_len=2
         return 0;
     }
     if (plt == MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_CONTROL) {
-        if (debugmode) ESP_LOGI(TAG, "PAYLOAD_TYPE_CONTROL NIY");
+        uint8_t type = data[pos] & 0xF0;
+        pos++;
+        if (debugmode) ESP_LOGI(TAG, "PAYLOAD_TYPE_CONTROL, type = 0x%02x", type);
+        if (type == 0x80 && (pos + 5 <= len)) {
+            uint8_t filter = data[pos];                   // bit for each ADV_TYPE_*
+            uint32_t tag = *((uint32_t*)&data[pos + 1]);  // random number
+            pos += 5;
+            uint32_t since = 0;  // optional, epoch
+            if (len > pos + 4) {
+                since = *((uint32_t*)&data[pos]);
+                pos += 4;
+            }
+            if (debugmode) ESP_LOGI(TAG, "Control packet: Request for node info filter=0x%02x, tag=0x%08" PRIx32 ", since=%lu", filter, tag, since);
+            // todo add event
+        }
+        if (type == 0x90 && debugmode) {
+            uint8_t snr = data[pos++] / 4;
+            uint32_t tag = *((uint32_t*)&data[pos]);
+            pos += 4;
+            uint8_t pubkey[PUB_KEY_SIZE];
+            memcpy(pubkey, &data[pos], PUB_KEY_SIZE);
+            pos += PUB_KEY_SIZE;
+            if (debugmode) ESP_LOGI(TAG, "Control packet: Response with node info: SNR=%u, tag=0x%08" PRIx32 ", pubkey=%02x%02x", snr, tag, pubkey[0], pubkey[1]);
+        }
         return 0;
     }
     return 0;

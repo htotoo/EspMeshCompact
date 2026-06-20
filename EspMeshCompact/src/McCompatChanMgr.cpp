@@ -49,7 +49,6 @@ MCC_ChannelEntry* McCompatChanMgr::getChannelByHashAndData(uint8_t* payload, siz
             ESP_LOGI("ChanMgr", "Channel %s matched hash", channel.name.c_str());
             auto lenn = McCompact::MACThenDecrypt(channel.secret, decoded, payload + 1, payload_len - 1);
             if (lenn > 0) {  // success!
-                // onGroupDataRecv(pkt, pkt->getPayloadType(), channels[j], data, lenn);
                 out_decoded_len = lenn;
                 ESP_LOGI("ChanMgr", "Decrypted with channel %s", channel.name.c_str());
                 return &channel;
