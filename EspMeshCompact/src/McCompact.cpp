@@ -569,10 +569,10 @@ I (106019) McCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg_len=2
         if (out_decoded_len > 0 && chan) {
             // todo extract other data too
             if (debugmode) ESP_LOGI(TAG, "Decrypted group text length: %zu", out_decoded_len);
-            if (debugmode) ESP_LOGI(TAG, "Decrypted group text: %s", decoded + 6);
+            if (debugmode) ESP_LOGI(TAG, "Decrypted group text: %s", decoded + 5);
             if (onGroupMsg) {
-                size_t msglen = strnlen((const char*)(decoded + 6), out_decoded_len - 6);
-                std::string grpmsg = std::string((const char*)(decoded + 6), msglen);
+                size_t msglen = strnlen((const char*)(decoded + 5), out_decoded_len - 5);
+                std::string grpmsg = std::string((const char*)(decoded + 5), msglen);
                 onGroupMsg(*chan, grpmsg);
             }
         } else {
