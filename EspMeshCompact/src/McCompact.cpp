@@ -596,7 +596,7 @@ I (106019) McCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg_len=2
             if (debugmode) ESP_LOGI(TAG, "Control packet: Request for node info filter=0x%02x, tag=0x%08" PRIx32 ", since=%lu", filter, tag, since);
             // todo add event
         }
-        if (type == 0x90 && debugmode) {
+        if (type == 0x90 && (pos + 5 + PUB_KEY_SIZE <= len)) {
             uint8_t snr = data[pos++] / 4;
             uint32_t tag = *((uint32_t*)&data[pos]);
             pos += 4;
