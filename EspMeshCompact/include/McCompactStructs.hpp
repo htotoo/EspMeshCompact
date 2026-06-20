@@ -59,6 +59,56 @@ class MCC_Header {
         return (MCC_ADDR_FORMAT)((header >> 6) & 0x03);
     }
 
+    uint32_t get_transport_codes() {
+        return transport_codes;
+    }
+
+    const char* get_route_type_str() {
+        switch (get_route_type()) {
+            case MCC_ROUTE_TYPE::ROUTE_TYPE_TRANSPORT_FLOOD:
+                return "TRANSPORT_FLOOD";
+            case MCC_ROUTE_TYPE::ROUTE_TYPE_FLOOD:
+                return "FLOOD";
+            case MCC_ROUTE_TYPE::ROUTE_TYPE_DIRECT:
+                return "DIRECT";
+            case MCC_ROUTE_TYPE::ROUTE_TYPE_TRANSPORT_DIRECT:
+                return "TRANSPORT_DIRECT";
+            default:
+                return "UNKNOWN";
+        }
+    }
+
+    const char* get_payload_type_str() {
+        switch (get_payload_type()) {
+            case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_REQ:
+                return "REQ";
+            case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_RESPONSE:
+                return "RESPONSE";
+            case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_TXT_MSG:
+                return "TXT_MSG";
+            case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_ACK:
+                return "ACK";
+            case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_ADVERT:
+                return "ADVERT";
+            case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_GRP_TXT:
+                return "GRP_TXT";
+            case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_GRP_DATA:
+                return "GRP_DATA";
+            case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_ANON_REQ:
+                return "ANON_REQ";
+            case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_PATH:
+                return "PATH";
+            case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_TRACE:
+                return "TRACE";
+            case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_MULTIPART:
+                return "MULTIPART";
+            case MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_RAW_CUSTOM:
+                return "RAW_CUSTOM";
+            default:
+                return "UNKNOWN";
+        }
+    }
+
     /**
      * @brief Parse the MCC header from the given data buffer.
      *
@@ -79,8 +129,9 @@ class MCC_Header {
             transport_codes = 0;
         }
         uint8_t meta = data[pos++];
-        uint8_t path_size = ((meta >> 6) & 0x03) + 1;  // 1, 2, or 3 bytes per hop
-        uint8_t path_count = (meta & 0x3F);            // Number of hops
+        uint8_t path_size = ((meta >> 6) & 0x03) + 1;      // 1, 2, or 3 bytes per hop
+        uint8_t path_count = (meta & 0x3F);                // Number of hops
+        if (len < pos + path_count * path_size) return 0;  // Not enough data for the path
         path.resize(path_count);
         for (int i = 0; i < path_count; ++i) {
             uint32_t current_hop = 0;
@@ -90,6 +141,7 @@ class MCC_Header {
 
             path[i] = current_hop;
         }
+        header_end_pos = pos;
         return pos;
     }
 
@@ -97,6 +149,7 @@ class MCC_Header {
     uint32_t transport_codes;    // optional 4 bytes
     std::vector<uint32_t> path;  // it'll store path_len too
     uint8_t path_size = 1;       // 1, 2, or 3 bytes per hop
+    size_t header_end_pos = 0;   // position in the buffer where the header ends. 0 = not decoded
 };
 
 class MCC_Nodeinfo {

@@ -462,7 +462,7 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
         if (debugmode) ESP_LOGE(TAG, "Failed to parse MCC header");
         return -1;
     }
-    if (debugmode) ESP_LOGI(TAG, "Received packet: route_type=%d, payload_type=%d, addr_format=%d, transport_codes=0x%08" PRIx32 ", path_length=%zu", (uint8_t)header.get_route_type(), (uint8_t)header.get_payload_type(), (uint8_t)header.get_addr_format(), header.transport_codes, header.path.size());
+    if (debugmode) ESP_LOGI(TAG, "Received packet: route_type=%s, payload_type=%s, addr_format=%d, transport_codes=0x%08" PRIx32 ", path_length=%zu", header.get_route_type_str(), header.get_payload_type_str(), (uint8_t)header.get_addr_format(), header.transport_codes, header.path.size());
     if (debugmode) {
         printf("%s: Path: ", TAG);  // Print the tag and header once
         for (const auto& hop : header.path) {
