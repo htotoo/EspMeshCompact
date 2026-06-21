@@ -426,7 +426,17 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
         uint8_t datadec[MAX_PACKET_PAYLOAD];
         // todo foreach peer list with that dst hash, and check for secret data if i can decrypt with it.
         uint8_t secret[PUB_KEY_SIZE] = {0};  // 32 bytes
-        int lenn = MACThenDecrypt(secret, datadec, macanddata, len - pos);
+        int lenn = 0;
+        for (const auto& peer : mshcomp->nodeinfo_db) {
+            memcpy(secret, peer.pubkey, PUB_KEY_SIZE);
+            lenn = MACThenDecrypt(secret, datadec, macanddata, len - pos);
+            if (lenn > 0) {
+                if (debugmode) ESP_LOGI(TAG, "Decrypted payload length: %d", lenn);
+                ESP_LOGI(TAG, "Decrypted payload: %s", datadec);
+                break;  // Exit the loop if decryption is successful
+            }
+        }
+
         if (lenn > 0) {
             if (debugmode) ESP_LOGI(TAG, "Decrypted payload length: %d", lenn);
             ESP_LOGI(TAG, "Decrypted payload: %s", datadec);
@@ -472,18 +482,18 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
             return 1;
             /*
             Received packet of length 38: 09 00 48 AC A0 13 C8 09 C2 36 BF F6 CC 78 B2 35 18 37 75 7D FC 9B 61 F2 0E 41 15 20 4B 52 C0 B2 55 DF 8A 8B E7 65
-I (86779) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
-I (86799) McCompact: Path:
-I (86799) McCompact: TXT_MSG packet: timestamp=918686152, flags=0xbf, msg_len=27, msg=��x�57u}��a�A KR��Uߊ��e
-Received packet of length 38: 09 00 48 AC 0D 5B 7D C7 81 BF CF 6E 4A 32 00 B8 6A 3E DE E9 F5 B2 61 F2 0E 41 15 20 4B 52 C0 B2 55 DF 8A 8B E7 65
-I (96189) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
-I (96209) McCompact: Path:
-I (96209) McCompact: TXT_MSG packet: timestamp=3212953469, flags=0xcf, msg_len=27, msg=nJ2
-Received packet of length 38: 09 00 48 AC EC D0 0E 15 8C 29 CC 1F AE C7 C8 58 83 A3 CF 5E 39 0F 61 F2 0E 41 15 20 4B 52 C0 B2 55 DF 8A 8B E7 65
-I (105999) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
-I (106019) McCompact: Path:
-I (106019) McCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg_len=27, msg=���X���^9a�A KR��Uߊ��e
-*/
+    I (86779) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
+    I (86799) McCompact: Path:
+    I (86799) McCompact: TXT_MSG packet: timestamp=918686152, flags=0xbf, msg_len=27, msg=��x�57u}��a�A KR��Uߊ��e
+    Received packet of length 38: 09 00 48 AC 0D 5B 7D C7 81 BF CF 6E 4A 32 00 B8 6A 3E DE E9 F5 B2 61 F2 0E 41 15 20 4B 52 C0 B2 55 DF 8A 8B E7 65
+    I (96189) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
+    I (96209) McCompact: Path:
+    I (96209) McCompact: TXT_MSG packet: timestamp=3212953469, flags=0xcf, msg_len=27, msg=nJ2
+    Received packet of length 38: 09 00 48 AC EC D0 0E 15 8C 29 CC 1F AE C7 C8 58 83 A3 CF 5E 39 0F 61 F2 0E 41 15 20 4B 52 C0 B2 55 DF 8A 8B E7 65
+    I (105999) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
+    I (106019) McCompact: Path:
+    I (106019) McCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg_len=27, msg=���X���^9a�A KR��Uߊ��e
+    */
         }
     }
 

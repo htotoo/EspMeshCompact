@@ -268,6 +268,21 @@ class MCC_Nodeinfo {
     bool has_location = false;
 };
 
+class MCC_MyNodeInfo : public MCC_Nodeinfo {
+   public:
+    MCC_MyNodeInfo() {
+        std::memset(priv_key, 0, sizeof(priv_key));
+        std::memset(pubkey, 0, sizeof(pubkey));
+    }
+    void sign(uint8_t* sig, const uint8_t* message, int msg_len) const;
+    void calcSharedSecret(uint8_t* secret, const uint8_t* other_pub_key) const;
+    void setPrivateKey(const uint8_t* priv);
+
+    bool generateKeyPair();
+
+    uint8_t priv_key[64];
+};
+
 class MCC_ChannelEntry {
    public:
     std::string name;

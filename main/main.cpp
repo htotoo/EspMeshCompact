@@ -36,6 +36,7 @@ extern "C" void app_main(void) {
     mesh.chan_mgr.addChannel("Public", "8b3387e9c5cdea6ac9e5edbaa115cd72");
     mesh.chan_mgr.addChannel("hungary", "d2ad7e4009b727fb4ee5c1ff51694e5e");
     mesh.chan_mgr.addChannel("ping", "3cae16fd067ba9c32a98be22e9b98525");
+    mesh.chan_mgr.addChannel("info", "ce51a275a0a0507c43d1651d78292320");
 
     mesh.setOnNodeInfo([](const MCC_Nodeinfo& info) {
         printf("Node Info received: NodeID=%u, Name=%s\n",
