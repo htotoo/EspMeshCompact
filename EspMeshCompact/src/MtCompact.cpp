@@ -31,11 +31,12 @@
 #define NODEINFO_BITFIELD_IS_KEY_MANUALLY_VERIFIED_MASK (1 << NODEINFO_BITFIELD_IS_KEY_MANUALLY_VERIFIED_SHIFT)
 
 volatile bool packetFlag = false;
+volatile bool packet_during_send = false;
 
 static_assert(CONFIG_ESP_MAIN_TASK_STACK_SIZE >= 8000, "Main task stack size must be at least 8000 bytes!");
 
 void IRAM_ATTR onPacketReceived() {
-    packetFlag = true;
+    packetFlag = true && !packet_during_send;  // Only set the flag if not currently sending
 }
 MtCompact::MtCompact() {
     mbedtls_aes_init(&aes_ctx);
@@ -420,6 +421,7 @@ void MtCompact::task_send(void* pvParameters) {
             // Send the packet
             {
                 std::unique_lock<std::mutex> lock(mshcomp->mtx_radio);
+                packet_during_send = true;  // Indicate that we are currently sending a packet
                 while (mshcomp->radio->scanChannel() != RADIOLIB_CHANNEL_FREE) {
                     // channel busy, wait a bit
                     vTaskDelay(20 / portTICK_PERIOD_MS);
@@ -440,6 +442,7 @@ void MtCompact::task_send(void* pvParameters) {
                         ESP_LOGE(TAG, "Failed to send packet 2 times in a row, code %d", err);
                     }
                 }
+                packet_during_send = false;  // Reset the flag after sending
                 mshcomp->radio->startReceive();
             }
         }
