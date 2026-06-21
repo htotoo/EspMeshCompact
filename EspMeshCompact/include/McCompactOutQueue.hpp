@@ -11,9 +11,9 @@ class McCompactOutQueue {
             return false;
         }
         if (!priority) {
-            queue.push_back(entry);
+            queue.push_back(std::move(entry));
         } else {
-            queue.push_front(entry);
+            queue.push_front(std::move(entry));
             while (queue.size() > MAX_ENTRIES) {
                 queue.pop_back();
             }

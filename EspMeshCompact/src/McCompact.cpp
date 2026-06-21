@@ -5,11 +5,12 @@
 #define TAG "McCompact"
 
 volatile bool packetFlag = false;
+volatile bool packet_during_send = false;
 
 static_assert(CONFIG_ESP_MAIN_TASK_STACK_SIZE >= 8000, "Main task stack size must be at least 8000 bytes!");
 
 void IRAM_ATTR onPacketReceived() {
-    packetFlag = true;
+    packetFlag = true && !packet_during_send;  // Only set the flag if not currently sending
 }
 
 McCompact::McCompact() {
@@ -288,8 +289,9 @@ void McCompact::task_send(void* pvParameters) {
         }
         if (mshcomp->is_send_enabled) {
             {
+                packet_during_send = true;  // Indicate that we are currently sending a packet
                 std::unique_lock<std::mutex> lock(mshcomp->mtx_radio);
-                ESP_LOGE(TAG, "Try send packet");
+                ESP_LOGE(TAG, "Try send packet. Len: %d", entry.length);
                 int err = mshcomp->radio->transmit(entry.payload, entry.length);
                 if (err == RADIOLIB_ERR_NONE) {
                     ESP_LOGI(TAG, "Packet sent successfully");
@@ -303,6 +305,7 @@ void McCompact::task_send(void* pvParameters) {
                         ESP_LOGE(TAG, "Failed to send packet 2 times in a row, code %d", err);
                     }
                 }
+                packet_during_send = false;      // Reset the flag after sending
                 mshcomp->radio->startReceive();  // Restart receiving after sending
             }
         }
@@ -426,7 +429,17 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
         uint8_t datadec[MAX_PACKET_PAYLOAD];
         // todo foreach peer list with that dst hash, and check for secret data if i can decrypt with it.
         uint8_t secret[PUB_KEY_SIZE] = {0};  // 32 bytes
-        int lenn = MACThenDecrypt(secret, datadec, macanddata, len - pos);
+        int lenn = 0;
+        for (const auto& peer : mshcomp->nodeinfo_db) {
+            memcpy(secret, peer.pubkey, PUB_KEY_SIZE);
+            lenn = MACThenDecrypt(secret, datadec, macanddata, len - pos);
+            if (lenn > 0) {
+                if (debugmode) ESP_LOGI(TAG, "Decrypted payload length: %d", lenn);
+                ESP_LOGI(TAG, "Decrypted payload: %s", datadec);
+                break;  // Exit the loop if decryption is successful
+            }
+        }
+
         if (lenn > 0) {
             if (debugmode) ESP_LOGI(TAG, "Decrypted payload length: %d", lenn);
             ESP_LOGI(TAG, "Decrypted payload: %s", datadec);
@@ -472,18 +485,18 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
             return 1;
             /*
             Received packet of length 38: 09 00 48 AC A0 13 C8 09 C2 36 BF F6 CC 78 B2 35 18 37 75 7D FC 9B 61 F2 0E 41 15 20 4B 52 C0 B2 55 DF 8A 8B E7 65
-I (86779) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
-I (86799) McCompact: Path:
-I (86799) McCompact: TXT_MSG packet: timestamp=918686152, flags=0xbf, msg_len=27, msg=��x�57u}��a�A KR��Uߊ��e
-Received packet of length 38: 09 00 48 AC 0D 5B 7D C7 81 BF CF 6E 4A 32 00 B8 6A 3E DE E9 F5 B2 61 F2 0E 41 15 20 4B 52 C0 B2 55 DF 8A 8B E7 65
-I (96189) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
-I (96209) McCompact: Path:
-I (96209) McCompact: TXT_MSG packet: timestamp=3212953469, flags=0xcf, msg_len=27, msg=nJ2
-Received packet of length 38: 09 00 48 AC EC D0 0E 15 8C 29 CC 1F AE C7 C8 58 83 A3 CF 5E 39 0F 61 F2 0E 41 15 20 4B 52 C0 B2 55 DF 8A 8B E7 65
-I (105999) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
-I (106019) McCompact: Path:
-I (106019) McCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg_len=27, msg=���X���^9a�A KR��Uߊ��e
-*/
+    I (86779) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
+    I (86799) McCompact: Path:
+    I (86799) McCompact: TXT_MSG packet: timestamp=918686152, flags=0xbf, msg_len=27, msg=��x�57u}��a�A KR��Uߊ��e
+    Received packet of length 38: 09 00 48 AC 0D 5B 7D C7 81 BF CF 6E 4A 32 00 B8 6A 3E DE E9 F5 B2 61 F2 0E 41 15 20 4B 52 C0 B2 55 DF 8A 8B E7 65
+    I (96189) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
+    I (96209) McCompact: Path:
+    I (96209) McCompact: TXT_MSG packet: timestamp=3212953469, flags=0xcf, msg_len=27, msg=nJ2
+    Received packet of length 38: 09 00 48 AC EC D0 0E 15 8C 29 CC 1F AE C7 C8 58 83 A3 CF 5E 39 0F 61 F2 0E 41 15 20 4B 52 C0 B2 55 DF 8A 8B E7 65
+    I (105999) McCompact: Received packet: route_type=1, payload_type=2, addr_format=0, transport_codes=0x00000000, path_length=0
+    I (106019) McCompact: Path:
+    I (106019) McCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg_len=27, msg=���X���^9a�A KR��Uߊ��e
+    */
         }
     }
 
@@ -506,7 +519,7 @@ I (106019) McCompact: TXT_MSG packet: timestamp=697046286, flags=0xcc, msg_len=2
                 onGroupMsg(*chan, grpmsg);
             }
         } else {
-            if (debugmode) ESP_LOGE(TAG, "Failed to decrypt group text");
+            if (debugmode) ESP_LOGE(TAG, "Failed to decrypt group text. chanhash: %d", data[0]);
         }
         return 0;
     }
@@ -672,4 +685,36 @@ int McCompact::secure_memcmp(const void* a, const void* b, size_t size) {
     }
 
     return result;
+}
+
+void McCompact::sendNodeInfo(const MCC_MyNodeInfo& info) {
+    McPacket_t packet;
+    // packet.length = info.
+    // todo
+}
+void McCompact::sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg) {
+}
+
+void McCompact::sendNeighborDiscoveryRequest(uint8_t filter, std::vector<uint32_t> path) {
+    McPacket_t packet;
+    MCC_Header header;
+    // size_t generate_header(McPacket_t* packet, uint8_t route_type,  uint8_t payload_type, std::vector<uint32_t> path, uint8_t path_bytenum = 1, uint32_t transport_code = 0) {
+    header.generate_header(&packet, (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_DIRECT, (uint8_t)MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_CONTROL, path, 1, 0);
+    uint32_t tag = (uint32_t)random();
+    packet.payload[packet.length++] = 0x80;  // control packet type: request for node data
+    packet.payload[packet.length++] = filter;
+    packet.payload[packet.length++] = (tag >> 24) & 0xFF;
+    packet.payload[packet.length++] = (tag >> 16) & 0xFF;
+    packet.payload[packet.length++] = (tag >> 8) & 0xFF;
+    packet.payload[packet.length++] = tag & 0xFF;
+    packet.payload[packet.length++] = 0;  // optional since uint32_t
+    packet.payload[packet.length++] = 0;
+    packet.payload[packet.length++] = 0;
+    packet.payload[packet.length++] = 0;
+    // try to send it
+    if (out_queue.push(packet)) {
+        if (debugmode) ESP_LOGI(TAG, "Neighbor discovery request sent, tag=0x%08" PRIx32, tag);
+    } else {
+        if (debugmode) ESP_LOGE(TAG, "Failed to send neighbor discovery request, queue full");
+    }
 }
