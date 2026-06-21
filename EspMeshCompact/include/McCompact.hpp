@@ -78,6 +78,32 @@ class McCompact {
         is_send_enabled = enabled;
     }
 
+    // nodeinfo settings
+
+    void setMyNames(const std::string& name) {
+        my_nodeinfo.name = name;
+    }
+    void setMyLocation(float latitude, float longitude) {
+        my_nodeinfo.latitude_i = static_cast<uint32_t>(latitude * 1e6);
+        my_nodeinfo.longitude_i = static_cast<uint32_t>(longitude * 1e6);
+        my_nodeinfo.has_location = true;
+    }
+
+    void setMyPrivateKey(const uint8_t* priv_key) {
+        my_nodeinfo.setPrivateKey(priv_key);
+    }
+    void generateMyKeyPair() {
+        my_nodeinfo.generateKeyPair();
+    }
+
+    void setMyTypeFlags(MCC_NODEINFO_FLAGS flag) {  // MCC_NODEINFO_FLAGS::IS_CHAT_NODE,  ... only 1
+        my_nodeinfo.flags = (uint8_t)flag;
+    }
+
+    MCC_MyNodeInfo* getMyNodeInfo() {
+        return &my_nodeinfo;
+    }
+
    private:
     RadioType radio_type;
     bool RadioListen();    // inits the listening thread for the radio
@@ -105,6 +131,7 @@ class McCompact {
 
     bool is_send_enabled = true;  // if false, disables sending of packets
 
+    MCC_MyNodeInfo my_nodeinfo;
     OnRaw onRaw = nullptr;
     OnNodeInfo onNodeInfo = nullptr;
     OnGroupMsg onGroupMsg = nullptr;
