@@ -18,6 +18,7 @@
 #include "McCompactStructs.hpp"
 #include "McCompactNodeInfoDB.hpp"
 #include "McCompatChanMgr.hpp"
+#include "McCompactOutQueue.hpp"
 #include "mbedtls/constant_time.h"
 
 #define MAX_PACKET_PAYLOAD 184
@@ -68,6 +69,14 @@ class McCompact {
     void setDebugMode(bool enabled) {
         debugmode = enabled;
     }
+    /**
+     * @brief Set the Send Enabled
+     *
+     * @param enabled If set to false, no packets will be sent, but we still receive them.
+     */
+    void setSendEnabled(bool enabled) {
+        is_send_enabled = enabled;
+    }
 
    private:
     RadioType radio_type;
@@ -94,7 +103,11 @@ class McCompact {
 
     bool debugmode = false;  // if true, enables debug logging
 
+    bool is_send_enabled = true;  // if false, disables sending of packets
+
     OnRaw onRaw = nullptr;
     OnNodeInfo onNodeInfo = nullptr;
     OnGroupMsg onGroupMsg = nullptr;
+
+    McCompactOutQueue out_queue;  // Outgoing queue for packets to be sent
 };

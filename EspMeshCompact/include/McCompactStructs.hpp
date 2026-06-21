@@ -7,6 +7,11 @@
 #include "RadioStructs.hpp"
 #include <cstring>
 
+typedef struct {
+    uint16_t length;
+    uint8_t payload[260];
+} McPacket_t;
+
 enum class MCC_ROUTE_TYPE {
     ROUTE_TYPE_TRANSPORT_FLOOD = 0,
     ROUTE_TYPE_FLOOD = 1,
@@ -146,6 +151,39 @@ class MCC_Header {
         }
         header_end_pos = pos;
         return pos;
+    }
+
+    size_t parse(McPacket_t* packet) {
+        return parse(packet->payload, packet->length);
+    }
+
+    size_t generate_header(uint8_t* buffer, size_t buffer_len, uint8_t route_type, uint8_t payload_type, std::vector<uint32_t> path, uint8_t path_bytenum = 1, uint32_t transport_code = 0) {
+        if (buffer_len < 4) return 0;
+        size_t pos = 0;
+        header = (route_type & 0x03) | ((payload_type & 0x0F) << 2) | (((uint8_t)MCC_PAYLOADVER::PAYLOAD_V1 & 0x03) << 6);
+        buffer[pos++] = header;
+        if (get_route_type() == MCC_ROUTE_TYPE::ROUTE_TYPE_TRANSPORT_FLOOD || get_route_type() == MCC_ROUTE_TYPE::ROUTE_TYPE_TRANSPORT_DIRECT) {
+            // in this case we have transport code 4 bytes
+            *((uint32_t*)&buffer[pos]) = transport_code;
+            pos += 4;
+        }
+        uint8_t meta = ((path_bytenum - 1) & 0x03) << 6;  // path_size is 1,2,3 -> store as 0,1,2
+        meta |= (path.size() & 0x3F);
+        buffer[pos++] = meta;
+        for (const auto& hop : path) {
+            for (int b = 0; b < path_size; ++b) {
+                buffer[pos++] = (hop >> (8 * b)) & 0xFF;
+            }
+        }
+        return pos;
+    }
+
+    size_t generate_header(McPacket_t* packet, uint8_t route_type, uint8_t payload_type, std::vector<uint32_t> path, uint8_t path_bytenum = 1, uint32_t transport_code = 0) {
+        size_t header_len = generate_header(packet->payload, sizeof(packet->payload), route_type, payload_type, path, path_bytenum, transport_code);
+        if (header_len > 0) {
+            packet->length = header_len;
+        }
+        return header_len;
     }
 
     uint8_t header;

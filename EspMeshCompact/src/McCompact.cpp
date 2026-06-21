@@ -279,103 +279,33 @@ bool McCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConf
 void McCompact::task_send(void* pvParameters) {
     McCompact* mshcomp = static_cast<McCompact*>(pvParameters);
     while (mshcomp->need_run) {
-        /* MCT_OutQueueEntry entry = mshcomp->out_queue.pop();
+        McPacket_t entry = mshcomp->out_queue.pop();
 
-         if (entry.header.srcnode == 0) {
-             // Stop flag was set, exit the task
-             ESP_LOGI(TAG, "Send task stopped");
-             continue;
-         }
-         if (mshcomp->is_send_enabled) {
-             // packet id fix:
-             if (entry.header.packet_id == 0) {
-                 entry.header.packet_id = mshcomp->hal->millis() + 100000;
-             }
-             // Prepare the payload
-             uint8_t payload[256];
-             uint8_t relay_node = 0;
-             // set some fields when it is from me
-             if (entry.header.srcnode == mshcomp->my_nodeinfo.node_id) {
-                 if (mshcomp->ok_to_mqtt) entry.data.bitfield |= 1 << BITFIELD_OK_TO_MQTT_SHIFT;  // Set the MQTT upload bit
-                 entry.data.bitfield |= 1 << (entry.data.want_response << BITFIELD_WANT_RESPONSE_SHIFT);
-                 entry.data.has_bitfield = true;
-             } else {
-                 relay_node = mshcomp->getLastByteOfNodeNum(mshcomp->my_nodeinfo.node_id);
-             }
-
-             size_t payload_len = mshcomp->pb_encode_to_bytes(payload, sizeof(payload), meshtastic_Data_fields, &entry.data);
-             // Encrypt the payload if needed
-             uint8_t encrypted_payload[256];
-             bool aesenc = true;
-             if (entry.encType == 0) {  // the auto enc method
-                 MCT_NodeInfo* dstnode = mshcomp->nodeinfo_db.get(entry.header.dstnode);
-                 if (entry.header.chan_hash == 0 && entry.header.dstnode != 0xffffffff && dstnode && (dstnode->public_key_size == 16 || dstnode->public_key_size == 32)) {
-                     bool all_zero = true;
-                     for (size_t i = 0; i < dstnode->public_key_size; i++) {
-                         if (dstnode->public_key[i] != 0) {
-                             all_zero = false;
-                             break;
-                         }
-                     }
-                     if (!all_zero) {
-                         aesenc = false;
-                     }
-                 }
-             }
-
-             if (entry.encType == 1)
-                 aesenc = true;  // AES encryption
-             else if (entry.encType == 2)
-                 aesenc = false;  // key
-
-             if (!aesenc) {
-                 // private message, encrypt with that method if pubkey is availeable //todo
-                 continue;
-             } else {
-                 if (mshcomp->aes_decrypt_meshtastic_payload(entry.key, entry.key_len * 8, entry.header.packet_id, entry.header.srcnode, payload, encrypted_payload, payload_len)) {
-                 } else {
-                     ESP_LOGE(TAG, "Failed to encrypt payload");
-                     continue;
-                 }
-             }
-             // here we got the encrypted payload
-             // create header. ugly but we'll reuse the payload buffer
-             memcpy(&payload[0], &entry.header.dstnode, sizeof(uint32_t));
-             memcpy(&payload[4], &entry.header.srcnode, sizeof(uint32_t));
-             memcpy(&payload[8], &entry.header.packet_id, sizeof(uint32_t));
-             payload[12] = (entry.header.hop_limit & PACKET_FLAGS_HOP_LIMIT_MASK) | (entry.header.want_ack ? PACKET_FLAGS_WANT_ACK_MASK : 0) | (entry.header.via_mqtt ? PACKET_FLAGS_VIA_MQTT_MASK : 0) | ((entry.header.hop_start & 0x07) << PACKET_FLAGS_HOP_START_SHIFT);
-             payload[13] = entry.header.chan_hash;
-             payload[14] = 0;           // entry.header.packet_next_hop; -- no preference
-             payload[15] = relay_node;  // entry.header.packet_relay_node;
-             // copy the encrypted payload to the end of the header
-             size_t total_len = 16 + payload_len;  // 16 bytes for header + payload length
-             if (total_len > sizeof(payload)) {
-                 ESP_LOGE(TAG, "Payload too large: %zu bytes", total_len);
-                 continue;
-             }
-             memcpy(&payload[16], encrypted_payload, payload_len);
-             // Send the packet
-             {
-                 std::unique_lock<std::mutex> lock(mshcomp->mtx_radio);
-                 ESP_LOGE(TAG, "Try send packet");
-                 int err = mshcomp->radio->transmit(payload, total_len);
-                 if (err == RADIOLIB_ERR_NONE) {
-                     ESP_LOGI(TAG, "Packet sent successfully to node 0x%08" PRIx32 ", ID: 0x%08" PRIx32, entry.header.dstnode, entry.header.packet_id);
-                 } else {
-                     ESP_LOGE(TAG, "Failed to send packet, code %d", err);
-                     vTaskDelay(30 / portTICK_PERIOD_MS);
-                     err = mshcomp->radio->transmit(payload, total_len);
-                     if (err == RADIOLIB_ERR_NONE) {
-                         ESP_LOGI(TAG, "Packet sent successfully in 2nd try to node 0x%08" PRIx32 ", ID: 0x%08" PRIx32, entry.header.dstnode, entry.header.packet_id);
-                     } else {
-                         ESP_LOGE(TAG, "Failed to send packet 2 times in a row, code %d", err);
-                     }
-                 }
-                 mshcomp->radio->startReceive();
-             }
-         }
-             */
-        // Restart receiving after sending
+        if (entry.length == 303) {
+            // Stop flag was set, exit the task
+            ESP_LOGI(TAG, "Send task stopped");
+            continue;
+        }
+        if (mshcomp->is_send_enabled) {
+            {
+                std::unique_lock<std::mutex> lock(mshcomp->mtx_radio);
+                ESP_LOGE(TAG, "Try send packet");
+                int err = mshcomp->radio->transmit(entry.payload, entry.length);
+                if (err == RADIOLIB_ERR_NONE) {
+                    ESP_LOGI(TAG, "Packet sent successfully");
+                } else {
+                    ESP_LOGE(TAG, "Failed to send packet, code %d", err);
+                    vTaskDelay(30 / portTICK_PERIOD_MS);
+                    err = mshcomp->radio->transmit(entry.payload, entry.length);
+                    if (err == RADIOLIB_ERR_NONE) {
+                        ESP_LOGI(TAG, "Packet sent successfully in 2nd try");
+                    } else {
+                        ESP_LOGE(TAG, "Failed to send packet 2 times in a row, code %d", err);
+                    }
+                }
+                mshcomp->radio->startReceive();  // Restart receiving after sending
+            }
+        }
         vTaskDelay(350 / portTICK_PERIOD_MS);  // Wait before next send attempt
     }  // end while
     // never reach here

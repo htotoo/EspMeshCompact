@@ -261,7 +261,7 @@ class MtCompact {
 
     bool debugmode = false;  // if true, enables debug logging
 
-    MeshCompactOutQueue out_queue;  // Outgoing queue for packets to be sent.
+    MtCompactOutQueue out_queue;  // Outgoing queue for packets to be sent.
 
     // Callback function pointers
     OnMessageCallback onMessage = nullptr;  // Function pointer for onMessage callback
