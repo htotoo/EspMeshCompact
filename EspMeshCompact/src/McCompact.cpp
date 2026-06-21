@@ -18,7 +18,7 @@ McCompact::McCompact() {
 McCompact::~McCompact() {
     need_run = false;  // Stop the tasks
     packetFlag = true;
-    // out_queue.stop_wait();                 // Notify any waiting pop() to unblock immediately
+    out_queue.stop_wait();                 // Notify any waiting pop() to unblock immediately
     vTaskDelay(150 / portTICK_PERIOD_MS);  // Give some time for tasks to finish
     if (radio) {
         radio->standby();
