@@ -289,7 +289,7 @@ void McCompact::task_send(void* pvParameters) {
         if (mshcomp->is_send_enabled) {
             {
                 std::unique_lock<std::mutex> lock(mshcomp->mtx_radio);
-                ESP_LOGE(TAG, "Try send packet");
+                ESP_LOGE(TAG, "Try send packet. Len: %d", entry.length);
                 int err = mshcomp->radio->transmit(entry.payload, entry.length);
                 if (err == RADIOLIB_ERR_NONE) {
                     ESP_LOGI(TAG, "Packet sent successfully");
@@ -516,7 +516,7 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
                 onGroupMsg(*chan, grpmsg);
             }
         } else {
-            if (debugmode) ESP_LOGE(TAG, "Failed to decrypt group text");
+            if (debugmode) ESP_LOGE(TAG, "Failed to decrypt group text. chanhash: %d", data[0]);
         }
         return 0;
     }
@@ -682,4 +682,36 @@ int McCompact::secure_memcmp(const void* a, const void* b, size_t size) {
     }
 
     return result;
+}
+
+void McCompact::sendNodeInfo(const MCC_MyNodeInfo& info) {
+    McPacket_t packet;
+    // packet.length = info.
+    // todo
+}
+void McCompact::sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg) {
+}
+
+void McCompact::sendNeighborDiscoveryRequest(uint8_t filter, std::vector<uint32_t> path) {
+    McPacket_t packet;
+    MCC_Header header;
+    // size_t generate_header(McPacket_t* packet, uint8_t route_type,  uint8_t payload_type, std::vector<uint32_t> path, uint8_t path_bytenum = 1, uint32_t transport_code = 0) {
+    header.generate_header(&packet, (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_DIRECT, (uint8_t)MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_CONTROL, path, 1, 0);
+    uint32_t tag = (uint32_t)random();
+    packet.payload[packet.length++] = 0x80;  // control packet type: request for node data
+    packet.payload[packet.length++] = filter;
+    packet.payload[packet.length++] = (tag >> 24) & 0xFF;
+    packet.payload[packet.length++] = (tag >> 16) & 0xFF;
+    packet.payload[packet.length++] = (tag >> 8) & 0xFF;
+    packet.payload[packet.length++] = tag & 0xFF;
+    packet.payload[packet.length++] = 0;  // optional since uint32_t
+    packet.payload[packet.length++] = 0;
+    packet.payload[packet.length++] = 0;
+    packet.payload[packet.length++] = 0;
+    // try to send it
+    if (out_queue.push(packet)) {
+        if (debugmode) ESP_LOGI(TAG, "Neighbor discovery request sent, tag=0x%08" PRIx32, tag);
+    } else {
+        if (debugmode) ESP_LOGE(TAG, "Failed to send neighbor discovery request, queue full");
+    }
 }

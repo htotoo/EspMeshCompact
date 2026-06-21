@@ -6,6 +6,7 @@
 #include "esp_system.h"
 
 #include "McCompact.hpp"
+#include "McCompactHelpers.hpp"
 
 Radio_PINS radio_pins = {9, 11, 10, 8, 14, 12, 13};  // Default radio pins for Heltec WSL V3. // https://github.com/meshtastic/firmware/blob/81828c6244daede254cf759a0f2bd939b2e7dd65/variants/heltec_wsl_v3/variant.h
 
@@ -38,6 +39,14 @@ extern "C" void app_main(void) {
     mesh.chan_mgr.addChannel("ping", "3cae16fd067ba9c32a98be22e9b98525");
     mesh.chan_mgr.addChannel("info", "ce51a275a0a0507c43d1651d78292320");
 
+    mesh.setOnRaw([](const uint8_t* data, size_t len) {
+        printf("Raw data received: ");
+        for (size_t i = 0; i < len; ++i) {
+            printf("%02X ", data[i]);
+        }
+        printf("\n");
+    });
+
     mesh.setOnNodeInfo([](const MCC_Nodeinfo& info) {
         printf("Node Info received: NodeID=%u, Name=%s\n",
                *((uint8_t*)&info.pubkey[28]),
@@ -46,8 +55,11 @@ extern "C" void app_main(void) {
     mesh.setOnGroupMsg([](const MCC_ChannelEntry& channel, const std::string& msg) {
         printf("Group Msg received on channel %s: %s\n", channel.name.c_str(), msg.c_str());
     });
+    std::string name = "TestNode";
+    McCompactHelpers::NodeInfoBuilder(mesh.getMyNodeInfo(), name, 47.4979, 19.0402, MCC_NODEINFO_FLAGS::IS_CHAT_NODE);
 
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(30000));
+        mesh.sendNeighborDiscoveryRequest(255);
     }
 }

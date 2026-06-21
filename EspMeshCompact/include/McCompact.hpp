@@ -104,6 +104,14 @@ class McCompact {
         return &my_nodeinfo;
     }
 
+    // senders
+    void sendNodeInfo(const MCC_MyNodeInfo& info);
+    void sendMyNodeInfo() {
+        sendNodeInfo(my_nodeinfo);
+    }
+    void sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg);
+    void sendNeighborDiscoveryRequest(uint8_t filter = 15, std::vector<uint32_t> path = {});
+
    private:
     RadioType radio_type;
     bool RadioListen();    // inits the listening thread for the radio
