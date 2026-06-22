@@ -699,11 +699,8 @@ void McCompact::sendNodeInfo(MCC_MyNodeInfo& info, bool flood, std::vector<uint3
     memcpy(&message[PUB_KEY_SIZE + 4], (const void*)&packet.payload[pos + PUB_KEY_SIZE + 4 + 64], pos2 - (PUB_KEY_SIZE + 4 + 64));
     msg_len = pos2 - pos - 64;  // Exclude the signature part
     uint8_t* signature = &packet.payload[pos + PUB_KEY_SIZE + 4];
-    onRaw(message, msg_len);
     info.sign(signature, message, msg_len);
     // try to send it
-
-    onRaw(packet.payload, packet.length);
     if (out_queue.push(packet)) {
         if (debugmode) ESP_LOGI(TAG, "Nodeinfo  sent");
     } else {
