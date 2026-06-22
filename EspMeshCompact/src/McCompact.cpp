@@ -395,10 +395,10 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
         if (debugmode) ESP_LOGE(TAG, "Failed to parse MCC header");
         return -1;
     }
-    if (debugmode) ESP_LOGI(TAG, "Received packet: route_type=%s, payload_type=%s, addr_format=%d, transport_codes=0x%08" PRIx32 ", path_length=%zu", header.get_route_type_str(), header.get_payload_type_str(), (uint8_t)header.get_payload_version(), header.transport_codes, header.path.size());
+    if (debugmode) ESP_LOGI(TAG, "Received packet: route_type=%s, payload_type=%s, addr_format=%d, transport_codes=0x%08" PRIx32 ", path_length=%zu", header.get_route_type_str(), header.get_payload_type_str(), (uint8_t)header.get_payload_version(), header.transport_codes, header.path.path.size());
     if (debugmode) {
         printf("%s: Path: ", TAG);  // Print the tag and header once
-        for (const auto& hop : header.path) {
+        for (const auto& hop : header.path.path) {
             printf(" %lX", hop);  // Print each hop in hex format
         }
         printf("\n");  // Add a single newline at the end
@@ -687,10 +687,10 @@ int McCompact::secure_memcmp(const void* a, const void* b, size_t size) {
     return result;
 }
 
-void McCompact::sendNodeInfo(MCC_MyNodeInfo& info, bool flood, std::vector<uint32_t>& path) {
+void McCompact::sendNodeInfo(MCC_MyNodeInfo& info, bool flood, MCC_Path& path) {
     McPacket_t packet;
     MCC_Header header;
-    size_t pos = header.generate_header(&packet, flood ? (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_FLOOD : (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_DIRECT, (uint8_t)MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_ADVERT, path, 1, 0);
+    size_t pos = header.generate_header(&packet, flood ? (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_FLOOD : (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_DIRECT, (uint8_t)MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_ADVERT, path, 0);
     size_t pos2 = info.generate_payload(packet);
     // sign it
     uint8_t message[PUB_KEY_SIZE + 4 + 32 + 32];
@@ -707,15 +707,18 @@ void McCompact::sendNodeInfo(MCC_MyNodeInfo& info, bool flood, std::vector<uint3
         if (debugmode) ESP_LOGE(TAG, "Failed to send nodeinfo, queue full");
     }
 }
-void McCompact::sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg, std::vector<uint32_t>& path) {
+void McCompact::sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg, MCC_Path& path) {
+    McPacket_t packet;
+    MCC_Header header;
+    size_t pos = header.generate_header(&packet, (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_FLOOD, (uint8_t)MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_GRP_TXT, path, 0);
 }
 
 void McCompact::sendNeighborDiscoveryRequest(uint8_t filter) {
     McPacket_t packet;
     MCC_Header header;
-    std::vector<uint32_t> path = {};  // Empty path for direct routing
+    MCC_Path path;  // Empty path for direct routing
     // size_t generate_header(McPacket_t* packet, uint8_t route_type,  uint8_t payload_type, std::vector<uint32_t> path, uint8_t path_bytenum = 1, uint32_t transport_code = 0) {
-    header.generate_header(&packet, (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_DIRECT, (uint8_t)MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_CONTROL, path, 1, 0);
+    header.generate_header(&packet, (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_DIRECT, (uint8_t)MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_CONTROL, path, 0);
     uint32_t tag = (uint32_t)random();
     packet.payload[packet.length++] = 0x80;  // control packet type: request for node data
     packet.payload[packet.length++] = filter;

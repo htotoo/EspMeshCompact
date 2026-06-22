@@ -105,19 +105,19 @@ class McCompact {
     }
 
     // senders
-    void sendNodeInfo(MCC_MyNodeInfo& info, bool flood, std::vector<uint32_t>& path);
+    void sendNodeInfo(MCC_MyNodeInfo& info, bool flood, MCC_Path& path);
     void sendNodeInfo(MCC_MyNodeInfo& info, bool flood = true) {
-        std::vector<uint32_t> path = {};
+        MCC_Path path = {};
         sendNodeInfo(info, flood, path);
     }
-    void sendMyNodeInfo(bool flood, std::vector<uint32_t>& path) {
+    void sendMyNodeInfo(bool flood, MCC_Path& path) {
         sendNodeInfo(my_nodeinfo, flood, path);
     }
     void sendMyNodeInfo(bool flood = true) {
-        std::vector<uint32_t> path = {};
+        MCC_Path path = {};
         sendNodeInfo(my_nodeinfo, flood, path);
     }
-    void sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg, std::vector<uint32_t>& path);
+    void sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg, MCC_Path& path);
     void sendNeighborDiscoveryRequest(uint8_t filter = 15);
 
    private:

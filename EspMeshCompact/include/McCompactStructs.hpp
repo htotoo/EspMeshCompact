@@ -53,6 +53,14 @@ enum class MCC_NODEINFO_FLAGS : uint8_t {
     HAS_NAME = 0x80         // appdata contains a node name
 };
 
+class MCC_Path {
+   public:
+    MCC_Path() : path_bytenum(1) {};
+    MCC_Path(uint8_t b) : path_bytenum(b) {};
+    std::vector<uint32_t> path = {};
+    uint8_t path_bytenum = 1;  // 1, 2, or 3 bytes per hop
+};
+
 class MCC_Header {
    public:
     MCC_ROUTE_TYPE get_route_type() {
@@ -140,14 +148,15 @@ class MCC_Header {
         uint8_t path_size = ((meta >> 6) & 0x03) + 1;      // 1, 2, or 3 bytes per hop
         uint8_t path_count = (meta & 0x3F);                // Number of hops
         if (len < pos + path_count * path_size) return 0;  // Not enough data for the path
-        path.resize(path_count);
+        path.path.resize(path_count);
+        path.path_bytenum = path_size;
         for (int i = 0; i < path_count; ++i) {
             uint32_t current_hop = 0;
             for (int b = 0; b < path_size; ++b) {
                 current_hop |= (uint32_t)data[pos++] << (8 * b);
             }
 
-            path[i] = current_hop;
+            path.path[i] = current_hop;
         }
         header_end_pos = pos;
         return pos;
@@ -157,7 +166,7 @@ class MCC_Header {
         return parse(packet->payload, packet->length);
     }
 
-    size_t generate_header(uint8_t* buffer, size_t buffer_len, uint8_t route_type, uint8_t payload_type, std::vector<uint32_t> path, uint8_t path_bytenum = 1, uint32_t transport_code = 0) {
+    size_t generate_header(uint8_t* buffer, size_t buffer_len, uint8_t route_type, uint8_t payload_type, MCC_Path& path, uint32_t transport_code = 0) {
         if (buffer_len < 4) return 0;
         size_t pos = 0;
         header = (route_type & 0x03) | ((payload_type & 0x0F) << 2) | (((uint8_t)MCC_PAYLOADVER::PAYLOAD_V1 & 0x03) << 6);
@@ -167,19 +176,19 @@ class MCC_Header {
             *((uint32_t*)&buffer[pos]) = transport_code;
             pos += 4;
         }
-        uint8_t meta = ((path_bytenum - 1) & 0x03) << 6;  // path_size is 1,2,3 -> store as 0,1,2
-        meta |= (path.size() & 0x3F);
+        uint8_t meta = ((path.path_bytenum - 1) & 0x03) << 6;  // path_size is 1,2,3 -> store as 0,1,2
+        meta |= (path.path.size() & 0x3F);
         buffer[pos++] = meta;
-        for (const auto& hop : path) {
-            for (int b = 0; b < path_size; ++b) {
+        for (const auto& hop : path.path) {
+            for (int b = 0; b < path.path_bytenum; ++b) {
                 buffer[pos++] = (hop >> (8 * b)) & 0xFF;
             }
         }
         return pos;
     }
 
-    size_t generate_header(McPacket_t* packet, uint8_t route_type, uint8_t payload_type, std::vector<uint32_t> path, uint8_t path_bytenum = 1, uint32_t transport_code = 0) {
-        size_t header_len = generate_header(packet->payload, sizeof(packet->payload), route_type, payload_type, path, path_bytenum, transport_code);
+    size_t generate_header(McPacket_t* packet, uint8_t route_type, uint8_t payload_type, MCC_Path& path, uint32_t transport_code = 0) {
+        size_t header_len = generate_header(packet->payload, sizeof(packet->payload), route_type, payload_type, path, transport_code);
         if (header_len > 0) {
             packet->length = header_len;
         }
@@ -187,10 +196,9 @@ class MCC_Header {
     }
 
     uint8_t header;
-    uint32_t transport_codes;    // optional 4 bytes
-    std::vector<uint32_t> path;  // it'll store path_len too
-    uint8_t path_size = 1;       // 1, 2, or 3 bytes per hop
-    size_t header_end_pos = 0;   // position in the buffer where the header ends. 0 = not decoded
+    uint32_t transport_codes;   // optional 4 bytes
+    MCC_Path path;              // it'll store path_len too
+    size_t header_end_pos = 0;  // position in the buffer where the header ends. 0 = not decoded
 };
 
 class MCC_Nodeinfo {

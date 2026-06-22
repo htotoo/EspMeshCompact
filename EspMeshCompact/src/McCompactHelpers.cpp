@@ -14,13 +14,13 @@ void McCompactHelpers::NodeInfoBuilder(MCC_MyNodeInfo* nodeinfo, std::string& na
     }
 }
 
-void McCompactHelpers::GenerateRandomPath(std::vector<uint32_t>& path, size_t length, uint8_t byte_per_entry) {
-    path.clear();
+void McCompactHelpers::GenerateRandomPath(MCC_Path& path, size_t length) {
+    path.path.clear();
     for (size_t i = 0; i < length; ++i) {
         uint32_t entry = 0;
-        for (uint8_t j = 0; j < byte_per_entry; ++j) {
+        for (uint8_t j = 0; j < path.path_bytenum; ++j) {
             entry |= (random() & 0xFF) << (j * 8);
         }
-        path.push_back(entry);
+        path.path.push_back(entry);
     }
 }
