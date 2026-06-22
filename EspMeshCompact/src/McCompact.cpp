@@ -687,17 +687,36 @@ int McCompact::secure_memcmp(const void* a, const void* b, size_t size) {
     return result;
 }
 
-void McCompact::sendNodeInfo(const MCC_MyNodeInfo& info) {
-    McPacket_t packet;
-    // packet.length = info.
-    // todo
-}
-void McCompact::sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg) {
-}
-
-void McCompact::sendNeighborDiscoveryRequest(uint8_t filter, std::vector<uint32_t> path) {
+void McCompact::sendNodeInfo(MCC_MyNodeInfo& info, bool flood, std::vector<uint32_t>& path) {
     McPacket_t packet;
     MCC_Header header;
+    size_t pos = header.generate_header(&packet, flood ? (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_FLOOD : (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_DIRECT, (uint8_t)MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_ADVERT, path, 1, 0);
+    size_t pos2 = info.generate_payload(packet);
+    // sign it
+    uint8_t message[PUB_KEY_SIZE + 4 + 32 + 32];
+    int msg_len = 0;
+    memcpy(&message[0], (const void*)&packet.payload[pos], PUB_KEY_SIZE + 4);
+    memcpy(&message[PUB_KEY_SIZE + 4], (const void*)&packet.payload[pos + PUB_KEY_SIZE + 4 + 64], pos2 - (PUB_KEY_SIZE + 4 + 64));
+    msg_len = pos2 - pos - 64;  // Exclude the signature part
+    uint8_t* signature = &packet.payload[pos + PUB_KEY_SIZE + 4];
+    onRaw(message, msg_len);
+    info.sign(signature, message, msg_len);
+    // try to send it
+
+    onRaw(packet.payload, packet.length);
+    if (out_queue.push(packet)) {
+        if (debugmode) ESP_LOGI(TAG, "Nodeinfo  sent");
+    } else {
+        if (debugmode) ESP_LOGE(TAG, "Failed to send nodeinfo, queue full");
+    }
+}
+void McCompact::sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg, std::vector<uint32_t>& path) {
+}
+
+void McCompact::sendNeighborDiscoveryRequest(uint8_t filter) {
+    McPacket_t packet;
+    MCC_Header header;
+    std::vector<uint32_t> path = {};  // Empty path for direct routing
     // size_t generate_header(McPacket_t* packet, uint8_t route_type,  uint8_t payload_type, std::vector<uint32_t> path, uint8_t path_bytenum = 1, uint32_t transport_code = 0) {
     header.generate_header(&packet, (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_DIRECT, (uint8_t)MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_CONTROL, path, 1, 0);
     uint32_t tag = (uint32_t)random();

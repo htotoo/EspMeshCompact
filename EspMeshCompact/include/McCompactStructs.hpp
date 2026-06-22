@@ -217,7 +217,7 @@ class MCC_Nodeinfo {
         pos += 32;
         timestamp = *((uint32_t*)&data[pos]);
         pos += 4;
-        // skip signature
+        // skip signature //todo check that!
         pos += 64;
         flags = data[pos++];
         if (flags & (uint8_t)MCC_NODEINFO_FLAGS::HAS_LOCATION) {
@@ -279,6 +279,8 @@ class MCC_MyNodeInfo : public MCC_Nodeinfo {
     void setPrivateKey(const uint8_t* priv);
 
     bool generateKeyPair();
+
+    size_t generate_payload(McPacket_t& packet);
 
     uint8_t priv_key[64];
 };

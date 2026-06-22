@@ -105,12 +105,20 @@ class McCompact {
     }
 
     // senders
-    void sendNodeInfo(const MCC_MyNodeInfo& info);
-    void sendMyNodeInfo() {
-        sendNodeInfo(my_nodeinfo);
+    void sendNodeInfo(MCC_MyNodeInfo& info, bool flood, std::vector<uint32_t>& path);
+    void sendNodeInfo(MCC_MyNodeInfo& info, bool flood = true) {
+        std::vector<uint32_t> path = {};
+        sendNodeInfo(info, flood, path);
     }
-    void sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg);
-    void sendNeighborDiscoveryRequest(uint8_t filter = 15, std::vector<uint32_t> path = {});
+    void sendMyNodeInfo(bool flood, std::vector<uint32_t>& path) {
+        sendNodeInfo(my_nodeinfo, flood, path);
+    }
+    void sendMyNodeInfo(bool flood = true) {
+        std::vector<uint32_t> path = {};
+        sendNodeInfo(my_nodeinfo, flood, path);
+    }
+    void sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg, std::vector<uint32_t>& path);
+    void sendNeighborDiscoveryRequest(uint8_t filter = 15);
 
    private:
     RadioType radio_type;

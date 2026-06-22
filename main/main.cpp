@@ -60,6 +60,8 @@ extern "C" void app_main(void) {
 
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(30000));
-        mesh.sendNeighborDiscoveryRequest(255);
+        std::vector<uint32_t> path;
+        McCompactHelpers::GenerateRandomPath(path, 10, 2);
+        // mesh.sendMyNodeInfo(true, path);
     }
 }

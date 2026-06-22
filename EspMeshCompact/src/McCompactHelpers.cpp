@@ -1,11 +1,11 @@
 #include "McCompactHelpers.hpp"
 
-void McCompactHelpers::NodeInfoBuilder(MCC_MyNodeInfo* nodeinfo, std::string& name, int32_t latitude_i, int32_t longitude_i, MCC_NODEINFO_FLAGS flags, const uint8_t* priv_key) {
+void McCompactHelpers::NodeInfoBuilder(MCC_MyNodeInfo* nodeinfo, std::string& name, float latitude, float longitude, MCC_NODEINFO_FLAGS flags, const uint8_t* priv_key) {
     if (!nodeinfo) return;
     nodeinfo->name = name;
-    nodeinfo->latitude_i = latitude_i;
-    nodeinfo->longitude_i = longitude_i;
-    nodeinfo->has_location = (latitude_i != 0 || longitude_i != 0);
+    nodeinfo->latitude_i = latitude * 1000000;    // Convert to microdegrees
+    nodeinfo->longitude_i = longitude * 1000000;  // Convert to microdegrees
+    nodeinfo->has_location = (latitude != 0 || longitude != 0);
     nodeinfo->flags = static_cast<uint8_t>(flags);
     if (priv_key) {
         nodeinfo->setPrivateKey(priv_key);
