@@ -48,12 +48,27 @@ extern "C" void app_main(void) {
     });
 
     mesh.setOnNodeInfo([](const MCC_Nodeinfo& info) {
-        printf("Node Info received: NodeID=%u, Name=%s\n",
+        printf("Node Info received: NodeID=%u, Name=%s, Time: %lu\n",
                *((uint8_t*)&info.pubkey[28]),
-               info.name.c_str());
+               info.name.c_str(),
+               info.timestamp);
+        if (time(nullptr) < 3000000) {
+            // set esp time from nodeinfo timestamp
+            struct timeval tv;
+            tv.tv_sec = info.timestamp;
+            tv.tv_usec = 0;
+            settimeofday(&tv, nullptr);
+        }
     });
-    mesh.setOnGroupMsg([](const MCC_ChannelEntry& channel, const std::string& msg) {
-        printf("Group Msg received on channel %s: %s\n", channel.name.c_str(), msg.c_str());
+    mesh.setOnGroupMsg([](const MCC_ChannelEntry& channel, const std::string& msg, uint32_t timestamp, uint8_t flags) {
+        printf("Group Msg (flags=0x%02x) received at %lu on channel %s: %s\n", flags, timestamp, channel.name.c_str(), msg.c_str());
+        if (time(nullptr) < 3000000) {
+            // set esp time from nodeinfo timestamp
+            struct timeval tv;
+            tv.tv_sec = timestamp;
+            tv.tv_usec = 0;
+            settimeofday(&tv, nullptr);
+        }
     });
     std::string name = "TestNode";
     McCompactHelpers::NodeInfoBuilder(mesh.getMyNodeInfo(), name, 47.4979, 19.0402, MCC_NODEINFO_FLAGS::IS_CHAT_NODE);
@@ -65,7 +80,9 @@ extern "C" void app_main(void) {
         std::string message = "ping";
         MCC_ChannelEntry* channel = mesh.chan_mgr.getChannelByName("ping");
         if (channel != nullptr) {
-            // mesh.sendGroupMsg(*channel, name, message, path_data);
+            if (time(nullptr) > 1782161287) {
+                mesh.sendGroupMsg(*channel, name, message, path_data);
+            }
         }
     }
 }

@@ -516,7 +516,9 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
             if (onGroupMsg) {
                 size_t msglen = strnlen((const char*)(decoded + 5), out_decoded_len - 5);
                 std::string grpmsg = std::string((const char*)(decoded + 5), msglen);
-                onGroupMsg(*chan, grpmsg);
+                uint32_t timestamp = *((uint32_t*)(decoded));
+                uint8_t flags = decoded[4];
+                onGroupMsg(*chan, grpmsg, timestamp, flags);
             }
         } else {
             if (debugmode) ESP_LOGE(TAG, "Failed to decrypt group text. chanhash: %d", data[pos]);
@@ -733,11 +735,9 @@ void McCompact::sendGroupMsg(const MCC_ChannelEntry& channel, const std::string&
 
     // Flag betöltése (bit0-1: attempts, bit2: signed/unsigned)
     message.push_back(0x00);
-
     // A szöveges üzenet bájtonkénti hozzáfűzése a vektor végéhez
     message.insert(message.end(), text_part.begin(), text_part.end());
-    // message.push_back(0x00);
-    //  Titkosítás hívása
+    // Titkosítás hívása
     int enlen = McCompact::encryptThenMAC(
         channel.secret,
         &packet.payload[pos],

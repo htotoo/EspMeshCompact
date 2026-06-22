@@ -38,7 +38,7 @@ class McCompact {
 
     using OnRaw = void (*)(const uint8_t* data, size_t len);
     using OnNodeInfo = void (*)(const MCC_Nodeinfo& info);
-    using OnGroupMsg = void (*)(const MCC_ChannelEntry& channel, const std::string& msg);  // todo extract other data
+    using OnGroupMsg = void (*)(const MCC_ChannelEntry& channel, const std::string& msg, uint32_t timestamp, uint8_t flags);
 
     void setOnRaw(OnRaw cb) { onRaw = cb; }
     void setOnNodeInfo(OnNodeInfo cb) { onNodeInfo = cb; }
