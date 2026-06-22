@@ -33,7 +33,7 @@ extern "C" void app_main(void) {
     }
     mesh.setDebugMode(true);  // Enable debug logging
     mesh.RadioInit(RadioType::SX1262, radio_pins, lora_config_mc);
-    mesh.chan_mgr.addChannel("TTest", "38c42a7bf8c329d8e7759ac8b1f83d96");
+    mesh.chan_mgr.addChannel("ttest", "7a568182fd29c410c53675107ea67ed3");
     mesh.chan_mgr.addChannel("Public", "8b3387e9c5cdea6ac9e5edbaa115cd72");
     mesh.chan_mgr.addChannel("hungary", "d2ad7e4009b727fb4ee5c1ff51694e5e");
     mesh.chan_mgr.addChannel("ping", "3cae16fd067ba9c32a98be22e9b98525");
@@ -62,6 +62,10 @@ extern "C" void app_main(void) {
         vTaskDelay(pdMS_TO_TICKS(30000));
         MCC_Path path_data(1);
         McCompactHelpers::GenerateRandomPath(path_data, 10 + rand() % 10);
-        // mesh.sendMyNodeInfo(true, path_data);
+        std::string message = "ping";
+        MCC_ChannelEntry* channel = mesh.chan_mgr.getChannelByName("ping");
+        if (channel != nullptr) {
+            // mesh.sendGroupMsg(*channel, name, message, path_data);
+        }
     }
 }

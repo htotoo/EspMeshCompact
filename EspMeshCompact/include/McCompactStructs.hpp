@@ -139,7 +139,7 @@ class MCC_Header {
         header = data[pos++];
         if (get_route_type() == MCC_ROUTE_TYPE::ROUTE_TYPE_TRANSPORT_FLOOD || get_route_type() == MCC_ROUTE_TYPE::ROUTE_TYPE_TRANSPORT_DIRECT) {
             // in this case we have transport code 4 bytes
-            transport_codes = *((uint32_t*)&data[pos]);
+            memcpy(&transport_codes, &data[pos], sizeof(transport_codes));
             pos += 4;
         } else {
             transport_codes = 0;
@@ -173,7 +173,7 @@ class MCC_Header {
         buffer[pos++] = header;
         if (get_route_type() == MCC_ROUTE_TYPE::ROUTE_TYPE_TRANSPORT_FLOOD || get_route_type() == MCC_ROUTE_TYPE::ROUTE_TYPE_TRANSPORT_DIRECT) {
             // in this case we have transport code 4 bytes
-            *((uint32_t*)&buffer[pos]) = transport_code;
+            memcpy(&buffer[pos], &transport_code, sizeof(transport_code));
             pos += 4;
         }
         uint8_t meta = ((path.path_bytenum - 1) & 0x03) << 6;  // path_size is 1,2,3 -> store as 0,1,2

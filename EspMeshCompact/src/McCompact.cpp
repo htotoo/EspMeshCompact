@@ -519,7 +519,7 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
                 onGroupMsg(*chan, grpmsg);
             }
         } else {
-            if (debugmode) ESP_LOGE(TAG, "Failed to decrypt group text. chanhash: %d", data[0]);
+            if (debugmode) ESP_LOGE(TAG, "Failed to decrypt group text. chanhash: %d", data[pos]);
         }
         return 0;
     }
@@ -627,15 +627,20 @@ int McCompact::encryptThenMAC(const uint8_t* shared_secret, uint8_t* dest, const
     int enc_len = encrypt(shared_secret, dest + CIPHER_MAC_SIZE, src, src_len);
     const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
     // This single function performs the reset, update, and finalize steps.
+    uint8_t temp_mac[32];
     int ret = mbedtls_md_hmac(
         md_info,                 // Use SHA256
         shared_secret,           // The key for the HMAC
-        PUB_KEY_SIZE,            // The length of the key
+        16,                      // The length of the key
         dest + CIPHER_MAC_SIZE,  // The message to authenticate
         enc_len,                 // The length of the message
-        dest                     // The destination for the 32-byte MAC output
+        temp_mac                 // The destination for the 32-byte MAC output
     );
-    return ret;
+    if (ret != 0) {
+        return 0;  // HMAC calculation failed
+    }
+    memcpy(dest, temp_mac, CIPHER_MAC_SIZE);
+    return enc_len + CIPHER_MAC_SIZE;  // Total length of MAC + ciphertext
 };
 int McCompact::MACThenDecrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
     if (src_len <= CIPHER_MAC_SIZE) {
@@ -707,10 +712,44 @@ void McCompact::sendNodeInfo(MCC_MyNodeInfo& info, bool flood, MCC_Path& path) {
         if (debugmode) ESP_LOGE(TAG, "Failed to send nodeinfo, queue full");
     }
 }
-void McCompact::sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg, MCC_Path& path) {
+void McCompact::sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& sender, const std::string& msg, MCC_Path& path) {
     McPacket_t packet;
     MCC_Header header;
     size_t pos = header.generate_header(&packet, (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_FLOOD, (uint8_t)MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_GRP_TXT, path, 0);
+    uint32_t timestamp = (uint32_t)time(NULL);
+    packet.payload[pos++] = channel.hash[0];
+    std::string text_part = sender + ": " + msg;
+
+    std::vector<uint8_t> message;
+
+    // Opcionális, de jó gyakorlat teljesítményszempontból: előre lefoglaljuk a memóriát
+    message.reserve(4 + 1 + text_part.length());
+
+    // 4 bájt timestamp betöltése (Little Endian sorrendben)
+    message.push_back(timestamp & 0xFF);
+    message.push_back((timestamp >> 8) & 0xFF);
+    message.push_back((timestamp >> 16) & 0xFF);
+    message.push_back((timestamp >> 24) & 0xFF);
+
+    // Flag betöltése (bit0-1: attempts, bit2: signed/unsigned)
+    message.push_back(0x00);
+
+    // A szöveges üzenet bájtonkénti hozzáfűzése a vektor végéhez
+    message.insert(message.end(), text_part.begin(), text_part.end());
+    // message.push_back(0x00);
+    //  Titkosítás hívása
+    int enlen = McCompact::encryptThenMAC(
+        channel.secret,
+        &packet.payload[pos],
+        message.data(),
+        message.size());
+    pos += enlen;
+    packet.length = pos;
+    if (out_queue.push(packet)) {
+        if (debugmode) ESP_LOGI(TAG, "Group message sent");
+    } else {
+        if (debugmode) ESP_LOGE(TAG, "Failed to send group message, queue full");
+    }
 }
 
 void McCompact::sendNeighborDiscoveryRequest(uint8_t filter) {

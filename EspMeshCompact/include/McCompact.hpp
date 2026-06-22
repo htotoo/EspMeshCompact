@@ -117,7 +117,11 @@ class McCompact {
         MCC_Path path = {};
         sendNodeInfo(my_nodeinfo, flood, path);
     }
-    void sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg, MCC_Path& path);
+
+    void sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& sender, const std::string& msg, MCC_Path& path);
+    void sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg, MCC_Path& path) {
+        sendGroupMsg(channel, my_nodeinfo.name, msg, path);
+    }
     void sendNeighborDiscoveryRequest(uint8_t filter = 15);
 
    private:
