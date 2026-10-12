@@ -1,6 +1,8 @@
 #include "McCompact.hpp"
 #include "esp_log.h"
 #include "psa/crypto.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "esp_mac.h"
 #define TAG "McCompact"
@@ -205,7 +207,7 @@ bool McCompact::setRadioPower(int8_t power) {
 bool McCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConfig& lora_config) {
     this->radio_type = radio_type;
     if (debugmode) ESP_LOGI(TAG, "RadioInit");
-    hal = new EspHal(radio_pins.sck, radio_pins.miso, radio_pins.mosi, radio_pins.cs);
+    hal = new EspHal(radio_pins.sck, radio_pins.miso, radio_pins.mosi);
     int state = RADIOLIB_ERR_NONE;
     switch (radio_type) {
         case RadioType::SX1262:
@@ -297,13 +299,13 @@ bool McCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConf
                 RADIOLIB_NC, RADIOLIB_NC, RADIOLIB_NC};
             static const Module::RfSwitchMode_t rfswitch_table[] = {
                 // mode                  DIO5  DIO6
-                {LR11x0::MODE_STBY, {LOW, LOW}},
-                {LR11x0::MODE_RX, {LOW, HIGH}},
-                {LR11x0::MODE_TX, {HIGH, LOW}},
-                {LR11x0::MODE_TX_HP, {HIGH, LOW}},
-                {LR11x0::MODE_TX_HF, {LOW, LOW}},
-                {LR11x0::MODE_GNSS, {LOW, LOW}},
-                {LR11x0::MODE_WIFI, {LOW, LOW}},
+                {LR11x0::MODE_STBY, {0, 0}},
+                {LR11x0::MODE_RX, {0, 1}},
+                {LR11x0::MODE_TX, {1, 0}},
+                {LR11x0::MODE_TX_HP, {1, 0}},
+                {LR11x0::MODE_TX_HF, {0, 0}},
+                {LR11x0::MODE_GNSS, {0, 0}},
+                {LR11x0::MODE_WIFI, {0, 0}},
                 END_OF_MODE_TABLE,
             };
             ((LR1121*)radio)->setRfSwitchTable(rfswitch_dio_pins, rfswitch_table);

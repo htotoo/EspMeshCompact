@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-
+idf_build_set_property(COMPILE_OPTIONS "-Wno-error=overloaded-virtual" "-fpermissive" APPEND)
 file(GLOB_RECURSE MT_SRCS  "./meshtastic/*.cpp")
 file(GLOB_RECURSE MY_SRCS "./src/*.cpp")
 file(GLOB_RECURSE ED25519_SRCS "./lib/ed25519/*.c")

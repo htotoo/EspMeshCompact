@@ -2,6 +2,8 @@
 #include "MtCompact.hpp"
 #include "esp_log.h"
 #include "psa/crypto.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "pb.h"
 #include "pb_decode.h"
 #include "pb_encode.h"
@@ -202,7 +204,7 @@ bool MtCompact::setRadioPower(int8_t power) {
 bool MtCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConfig& lora_config) {
     this->radio_type = radio_type;
     ESP_LOGI(TAG, "RadioInit");
-    hal = new EspHal(radio_pins.sck, radio_pins.miso, radio_pins.mosi, radio_pins.cs);
+    hal = new EspHal(radio_pins.sck, radio_pins.miso, radio_pins.mosi);
     int state = RADIOLIB_ERR_NONE;
     switch (radio_type) {
         case RadioType::SX1262:
@@ -294,13 +296,13 @@ bool MtCompact::RadioInit(RadioType radio_type, Radio_PINS& radio_pins, LoraConf
                 RADIOLIB_NC, RADIOLIB_NC, RADIOLIB_NC};
             static const Module::RfSwitchMode_t rfswitch_table[] = {
                 // mode                  DIO5  DIO6
-                {LR11x0::MODE_STBY, {LOW, LOW}},
-                {LR11x0::MODE_RX, {LOW, HIGH}},
-                {LR11x0::MODE_TX, {HIGH, LOW}},
-                {LR11x0::MODE_TX_HP, {HIGH, LOW}},
-                {LR11x0::MODE_TX_HF, {LOW, LOW}},
-                {LR11x0::MODE_GNSS, {LOW, LOW}},
-                {LR11x0::MODE_WIFI, {LOW, LOW}},
+                {LR11x0::MODE_STBY, {0, 0}},
+                {LR11x0::MODE_RX, {0, 1}},
+                {LR11x0::MODE_TX, {1, 0}},
+                {LR11x0::MODE_TX_HP, {1, 0}},
+                {LR11x0::MODE_TX_HF, {0, 0}},
+                {LR11x0::MODE_GNSS, {0, 0}},
+                {LR11x0::MODE_WIFI, {0, 0}},
                 END_OF_MODE_TABLE,
             };
             ((LR1121*)radio)->setRfSwitchTable(rfswitch_dio_pins, rfswitch_table);
@@ -1023,17 +1025,48 @@ bool MtCompact::aes_decrypt_meshtastic_payload(const uint8_t* key, uint16_t keyS
     memset(nonce, 0, 16);
     memcpy(nonce, &packet_id, sizeof(uint32_t));
     memcpy(nonce + 8, &from_node, sizeof(uint32_t));
+    psa_cipher_operation_t operation = PSA_CIPHER_OPERATION_INIT;
+    status = psa_cipher_decrypt_setup(&operation, key_id, PSA_ALG_CTR);
+    bool operation_active = status == PSA_SUCCESS;
+    if (status == PSA_SUCCESS) {
+        status = psa_cipher_set_iv(&operation, nonce, sizeof(nonce));
+    }
+
+    uint8_t empty_output = 0;
+    uint8_t* output = decrypted_out != nullptr ? decrypted_out : &empty_output;
     size_t output_len = 0;
-    status = psa_cipher_decrypt(key_id, PSA_ALG_CTR, nonce, sizeof(nonce), encrypted_in, len,
-                                decrypted_out, len, &output_len);
+    if (status == PSA_SUCCESS) {
+        status = psa_cipher_update(&operation, encrypted_in, len, output, len, &output_len);
+    }
+
+    size_t final_output_len = 0;
+    if (status == PSA_SUCCESS && output_len <= len) {
+        status = psa_cipher_finish(&operation, output + output_len, len - output_len,
+                                   &final_output_len);
+        operation_active = status != PSA_SUCCESS;
+    } else if (status == PSA_SUCCESS) {
+        status = PSA_ERROR_GENERIC_ERROR;
+    }
+
+    psa_status_t abort_status = PSA_SUCCESS;
+    if (operation_active) {
+        abort_status = psa_cipher_abort(&operation);
+    }
     psa_status_t destroy_status = psa_destroy_key(key_id);
-    if (status != PSA_SUCCESS || output_len != len) {
+    const bool output_size_valid = output_len <= len && final_output_len <= len - output_len;
+    const size_t total_output_len = output_size_valid ? output_len + final_output_len : 0;
+    if (abort_status != PSA_SUCCESS && debugmode) {
+        ESP_LOGE(TAG, "AES cipher operation cleanup failed: %ld", static_cast<long>(abort_status));
+    }
+    if (destroy_status != PSA_SUCCESS && debugmode) {
+        ESP_LOGE(TAG, "AES key cleanup failed: %ld", static_cast<long>(destroy_status));
+    }
+    if (status != PSA_SUCCESS || !output_size_valid || total_output_len != len) {
         if (status == PSA_SUCCESS) status = PSA_ERROR_GENERIC_ERROR;
         if (debugmode) ESP_LOGE(TAG, "AES-CTR decryption failed: %ld", static_cast<long>(status));
         return false;
     }
-    if (destroy_status != PSA_SUCCESS) {
-        if (debugmode) ESP_LOGE(TAG, "AES key cleanup failed: %ld", static_cast<long>(destroy_status));
+    if (abort_status != PSA_SUCCESS || destroy_status != PSA_SUCCESS) {
         return false;
     }
     return true;
