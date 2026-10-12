@@ -9,7 +9,6 @@
 #include "RadioLib.h"
 #include "EspHal.h"
 #include "esp_random.h"
-#include "mbedtls/aes.h"
 #include <string>
 #include "meshtastic/mesh.pb.h"
 #include "MtCompactStructs.hpp"
@@ -255,7 +254,6 @@ class MtCompact {
     uint8_t nonce[16] = {0};
     AESSmall256* aes = NULL;
 
-    mbedtls_aes_context aes_ctx;
     mutable std::mutex mtx_radio;
     bool need_run = true;  // thread exit flag
 

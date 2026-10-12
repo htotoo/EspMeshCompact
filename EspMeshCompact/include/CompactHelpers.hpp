@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 #include <string>
-#include "mbedtls/sha256.h"
 #include <cstring>
 
 #define END_OF_MODE_TABLE             \

@@ -8,8 +8,6 @@
 #include "RadioLib.h"
 #include "EspHal.h"
 #include "esp_random.h"
-#include "mbedtls/aes.h"
-#include "mbedtls/md.h"
 #include <string>
 #include <mutex>
 #include <condition_variable>
@@ -19,7 +17,6 @@
 #include "McCompactNodeInfoDB.hpp"
 #include "McCompatChanMgr.hpp"
 #include "McCompactOutQueue.hpp"
-#include "mbedtls/constant_time.h"
 
 #define MAX_PACKET_PAYLOAD 184
 #define PUB_KEY_SIZE 32
@@ -38,7 +35,7 @@ class McCompact {
 
     using OnRaw = void (*)(const uint8_t* data, size_t len);
     using OnNodeInfo = void (*)(const MCC_Nodeinfo& info);
-    using OnGroupMsg = void (*)(const MCC_ChannelEntry& channel, const std::string& msg);  // todo extract other data
+    using OnGroupMsg = void (*)(const MCC_ChannelEntry& channel, const std::string& msg, uint32_t timestamp, uint8_t flags);
 
     void setOnRaw(OnRaw cb) { onRaw = cb; }
     void setOnNodeInfo(OnNodeInfo cb) { onNodeInfo = cb; }
@@ -105,12 +102,24 @@ class McCompact {
     }
 
     // senders
-    void sendNodeInfo(const MCC_MyNodeInfo& info);
-    void sendMyNodeInfo() {
-        sendNodeInfo(my_nodeinfo);
+    void sendNodeInfo(MCC_MyNodeInfo& info, bool flood, MCC_Path& path);
+    void sendNodeInfo(MCC_MyNodeInfo& info, bool flood = true) {
+        MCC_Path path = {};
+        sendNodeInfo(info, flood, path);
     }
-    void sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg);
-    void sendNeighborDiscoveryRequest(uint8_t filter = 15, std::vector<uint32_t> path = {});
+    void sendMyNodeInfo(bool flood, MCC_Path& path) {
+        sendNodeInfo(my_nodeinfo, flood, path);
+    }
+    void sendMyNodeInfo(bool flood = true) {
+        MCC_Path path = {};
+        sendNodeInfo(my_nodeinfo, flood, path);
+    }
+
+    void sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& sender, const std::string& msg, MCC_Path& path);
+    void sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg, MCC_Path& path) {
+        sendGroupMsg(channel, my_nodeinfo.name, msg, path);
+    }
+    void sendNeighborDiscoveryRequest(uint8_t filter = 15);
 
    private:
     RadioType radio_type;

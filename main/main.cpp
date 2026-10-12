@@ -33,7 +33,7 @@ extern "C" void app_main(void) {
     }
     mesh.setDebugMode(true);  // Enable debug logging
     mesh.RadioInit(RadioType::SX1262, radio_pins, lora_config_mc);
-    mesh.chan_mgr.addChannel("TTest", "38c42a7bf8c329d8e7759ac8b1f83d96");
+    mesh.chan_mgr.addChannel("ttest", "7a568182fd29c410c53675107ea67ed3");
     mesh.chan_mgr.addChannel("Public", "8b3387e9c5cdea6ac9e5edbaa115cd72");
     mesh.chan_mgr.addChannel("hungary", "d2ad7e4009b727fb4ee5c1ff51694e5e");
     mesh.chan_mgr.addChannel("ping", "3cae16fd067ba9c32a98be22e9b98525");
@@ -48,18 +48,41 @@ extern "C" void app_main(void) {
     });
 
     mesh.setOnNodeInfo([](const MCC_Nodeinfo& info) {
-        printf("Node Info received: NodeID=%u, Name=%s\n",
+        printf("Node Info received: NodeID=%u, Name=%s, Time: %lu\n",
                *((uint8_t*)&info.pubkey[28]),
-               info.name.c_str());
+               info.name.c_str(),
+               info.timestamp);
+        if (time(nullptr) < 3000000) {
+            // set esp time from nodeinfo timestamp
+            struct timeval tv;
+            tv.tv_sec = info.timestamp;
+            tv.tv_usec = 0;
+            settimeofday(&tv, nullptr);
+        }
     });
-    mesh.setOnGroupMsg([](const MCC_ChannelEntry& channel, const std::string& msg) {
-        printf("Group Msg received on channel %s: %s\n", channel.name.c_str(), msg.c_str());
+    mesh.setOnGroupMsg([](const MCC_ChannelEntry& channel, const std::string& msg, uint32_t timestamp, uint8_t flags) {
+        printf("Group Msg (flags=0x%02x) received at %lu on channel %s: %s\n", flags, timestamp, channel.name.c_str(), msg.c_str());
+        if (time(nullptr) < 3000000) {
+            // set esp time from nodeinfo timestamp
+            struct timeval tv;
+            tv.tv_sec = timestamp;
+            tv.tv_usec = 0;
+            settimeofday(&tv, nullptr);
+        }
     });
     std::string name = "TestNode";
     McCompactHelpers::NodeInfoBuilder(mesh.getMyNodeInfo(), name, 47.4979, 19.0402, MCC_NODEINFO_FLAGS::IS_CHAT_NODE);
 
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(30000));
-        mesh.sendNeighborDiscoveryRequest(255);
+        MCC_Path path_data(1);
+        McCompactHelpers::GenerateRandomPath(path_data, 10 + rand() % 10);
+        std::string message = "ping";
+        MCC_ChannelEntry* channel = mesh.chan_mgr.getChannelByName("ping");
+        if (channel != nullptr) {
+            if (time(nullptr) > 1782161287) {
+                mesh.sendGroupMsg(*channel, name, message, path_data);
+            }
+        }
     }
 }

@@ -1,8 +1,65 @@
 #include "McCompact.hpp"
-
 #include "esp_log.h"
+#include "psa/crypto.h"
+
 #include "esp_mac.h"
 #define TAG "McCompact"
+
+namespace {
+psa_status_t importAesKey(const uint8_t* key, size_t key_len, psa_algorithm_t algorithm, psa_key_usage_t usage, psa_key_id_t* key_id) {
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+    psa_set_key_bits(&attributes, key_len * 8);
+    psa_set_key_usage_flags(&attributes, usage);
+    psa_set_key_algorithm(&attributes, algorithm);
+    psa_status_t status = psa_import_key(&attributes, key, key_len, key_id);
+    psa_reset_key_attributes(&attributes);
+    return status;
+}
+
+bool initializePsaCrypto() {
+    psa_status_t status = psa_crypto_init();
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "PSA crypto initialization failed: %ld", static_cast<long>(status));
+        return false;
+    }
+    return true;
+}
+
+bool computeHmacSha256(const uint8_t* key, const uint8_t* message, size_t message_len, uint8_t mac[32]) {
+    if (key == nullptr || mac == nullptr || (message_len > 0 && message == nullptr) || !initializePsaCrypto()) {
+        return false;
+    }
+
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_HMAC);
+    psa_set_key_bits(&attributes, CIPHER_KEY_SIZE * 8);
+    psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_SIGN_MESSAGE);
+    psa_set_key_algorithm(&attributes, PSA_ALG_HMAC(PSA_ALG_SHA_256));
+    psa_key_id_t key_id;
+    psa_status_t status = psa_import_key(&attributes, key, CIPHER_KEY_SIZE, &key_id);
+    psa_reset_key_attributes(&attributes);
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "HMAC key import failed: %ld", static_cast<long>(status));
+        return false;
+    }
+
+    size_t mac_len = 0;
+    status = psa_mac_compute(key_id, PSA_ALG_HMAC(PSA_ALG_SHA_256), message, message_len,
+                             mac, 32, &mac_len);
+    psa_status_t destroy_status = psa_destroy_key(key_id);
+    if (status != PSA_SUCCESS || mac_len != 32) {
+        if (status == PSA_SUCCESS) status = PSA_ERROR_GENERIC_ERROR;
+        ESP_LOGE(TAG, "HMAC computation failed: %ld", static_cast<long>(status));
+        return false;
+    }
+    if (destroy_status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "HMAC key cleanup failed: %ld", static_cast<long>(destroy_status));
+        return false;
+    }
+    return true;
+}
+}
 
 volatile bool packetFlag = false;
 volatile bool packet_during_send = false;
@@ -395,10 +452,10 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
         if (debugmode) ESP_LOGE(TAG, "Failed to parse MCC header");
         return -1;
     }
-    if (debugmode) ESP_LOGI(TAG, "Received packet: route_type=%s, payload_type=%s, addr_format=%d, transport_codes=0x%08" PRIx32 ", path_length=%zu", header.get_route_type_str(), header.get_payload_type_str(), (uint8_t)header.get_payload_version(), header.transport_codes, header.path.size());
+    if (debugmode) ESP_LOGI(TAG, "Received packet: route_type=%s, payload_type=%s, addr_format=%d, transport_codes=0x%08" PRIx32 ", path_length=%zu", header.get_route_type_str(), header.get_payload_type_str(), (uint8_t)header.get_payload_version(), header.transport_codes, header.path.path.size());
     if (debugmode) {
         printf("%s: Path: ", TAG);  // Print the tag and header once
-        for (const auto& hop : header.path) {
+        for (const auto& hop : header.path.path) {
             printf(" %lX", hop);  // Print each hop in hex format
         }
         printf("\n");  // Add a single newline at the end
@@ -516,10 +573,12 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
             if (onGroupMsg) {
                 size_t msglen = strnlen((const char*)(decoded + 5), out_decoded_len - 5);
                 std::string grpmsg = std::string((const char*)(decoded + 5), msglen);
-                onGroupMsg(*chan, grpmsg);
+                uint32_t timestamp = *((uint32_t*)(decoded));
+                uint8_t flags = decoded[4];
+                onGroupMsg(*chan, grpmsg, timestamp, flags);
             }
         } else {
-            if (debugmode) ESP_LOGE(TAG, "Failed to decrypt group text. chanhash: %d", data[0]);
+            if (debugmode) ESP_LOGE(TAG, "Failed to decrypt group text. chanhash: %d", data[pos]);
         }
         return 0;
     }
@@ -554,115 +613,115 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
 }
 
 int McCompact::decrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
-    mbedtls_aes_context aes_ctx;
-    uint8_t* dp = dest;
-    const uint8_t* sp = src;
-    // Initialize the AES context
-    mbedtls_aes_init(&aes_ctx);
-    // Set the decryption key. Note the use of `_setkey_dec`
-    // IMPORTANT: CIPHER_KEY_SIZE must be in BITS (e.g., 128, 192, 256)
-    mbedtls_aes_setkey_dec(&aes_ctx, shared_secret, CIPHER_KEY_SIZE * 8);
-
-    // Process all 16-byte blocks
-    for (int i = 0; i < src_len; i += 16) {
-        mbedtls_aes_crypt_ecb(
-            &aes_ctx,             // AES context
-            MBEDTLS_AES_DECRYPT,  // Decrypt mode
-            sp,                   // Source ciphertext block
-            dp                    // Destination plaintext block
-        );
-        dp += 16;
-        sp += 16;
+    if (src_len < 0 || src_len % CIPHER_BLOCK_SIZE != 0 ||
+        (src_len > 0 && (shared_secret == nullptr || dest == nullptr || src == nullptr))) {
+        ESP_LOGE(TAG, "Invalid AES-ECB input");
+        return 0;
     }
-    // Clean up the context
-    mbedtls_aes_free(&aes_ctx);
-    // Return the total number of bytes processed
-    return sp - src;
+    if (src_len == 0) return 0;
+    if (!initializePsaCrypto()) return 0;
+
+    psa_key_id_t key_id;
+    psa_status_t status = importAesKey(shared_secret, CIPHER_KEY_SIZE, PSA_ALG_ECB_NO_PADDING,
+                                       PSA_KEY_USAGE_DECRYPT, &key_id);
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "AES key import failed: %ld", static_cast<long>(status));
+        return 0;
+    }
+
+    int processed = 0;
+    for (; processed < src_len; processed += CIPHER_BLOCK_SIZE) {
+        size_t output_len = 0;
+        status = psa_cipher_decrypt(key_id, PSA_ALG_ECB_NO_PADDING, src + processed, CIPHER_BLOCK_SIZE,
+                                    dest + processed, CIPHER_BLOCK_SIZE, &output_len);
+        if (status != PSA_SUCCESS || output_len != CIPHER_BLOCK_SIZE) {
+            if (status == PSA_SUCCESS) status = PSA_ERROR_GENERIC_ERROR;
+            ESP_LOGE(TAG, "AES-ECB decryption failed: %ld", static_cast<long>(status));
+            break;
+        }
+    }
+    psa_status_t destroy_status = psa_destroy_key(key_id);
+    if (destroy_status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "AES key cleanup failed: %ld", static_cast<long>(destroy_status));
+        return 0;
+    }
+    return processed == src_len ? processed : 0;
 };
 int McCompact::encrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
-    mbedtls_aes_context aes_ctx;
-    uint8_t* dp = dest;
-    const uint8_t* sp = src;
-    int remaining_len = src_len;
-    // Initialize the AES context
-    mbedtls_aes_init(&aes_ctx);
-    // Set the encryption key.
-    // IMPORTANT: CIPHER_KEY_SIZE must be in BITS (e.g., 128, 192, 256)
-    mbedtls_aes_setkey_enc(&aes_ctx, shared_secret, CIPHER_KEY_SIZE * 8);
-    // Process all full 16-byte blocks
-    while (remaining_len >= 16) {
-        mbedtls_aes_crypt_ecb(
-            &aes_ctx,             // AES context
-            MBEDTLS_AES_ENCRYPT,  // Encrypt mode
-            sp,                   // Source block
-            dp                    // Destination block
-        );
-        dp += 16;
-        sp += 16;
-        remaining_len -= 16;
+    if (src_len < 0 || (src_len > 0 && (shared_secret == nullptr || dest == nullptr || src == nullptr))) {
+        ESP_LOGE(TAG, "Invalid AES-ECB input");
+        return 0;
+    }
+    if (src_len == 0) return 0;
+    if (!initializePsaCrypto()) return 0;
+
+    psa_key_id_t key_id;
+    psa_status_t status = importAesKey(shared_secret, CIPHER_KEY_SIZE, PSA_ALG_ECB_NO_PADDING,
+                                       PSA_KEY_USAGE_ENCRYPT, &key_id);
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "AES key import failed: %ld", static_cast<long>(status));
+        return 0;
     }
 
-    // Handle the final partial block with zero padding
-    if (remaining_len > 0) {
-        uint8_t tmp_block[16];
-        // Pad the temporary block with zeros
-        memset(tmp_block, 0, 16);
-        // Copy the remaining plaintext into the block
-        memcpy(tmp_block, sp, remaining_len);
-        // Encrypt the padded block
-        mbedtls_aes_crypt_ecb(
-            &aes_ctx,
-            MBEDTLS_AES_ENCRYPT,
-            tmp_block,
-            dp);
-        dp += 16;
+    int input_offset = 0;
+    int output_offset = 0;
+    while (src_len - input_offset >= CIPHER_BLOCK_SIZE) {
+        size_t output_len = 0;
+        status = psa_cipher_encrypt(key_id, PSA_ALG_ECB_NO_PADDING, src + input_offset, CIPHER_BLOCK_SIZE,
+                                    dest + output_offset, CIPHER_BLOCK_SIZE, &output_len);
+        if (status != PSA_SUCCESS || output_len != CIPHER_BLOCK_SIZE) {
+            if (status == PSA_SUCCESS) status = PSA_ERROR_GENERIC_ERROR;
+            ESP_LOGE(TAG, "AES-ECB encryption failed: %ld", static_cast<long>(status));
+            break;
+        }
+        input_offset += CIPHER_BLOCK_SIZE;
+        output_offset += CIPHER_BLOCK_SIZE;
     }
-    // Clean up the context
-    mbedtls_aes_free(&aes_ctx);
-    // Return the total number of bytes written to the destination
-    return dp - dest;
+    if (status == PSA_SUCCESS && input_offset < src_len) {
+        uint8_t padded_block[CIPHER_BLOCK_SIZE] = {};
+        const size_t remainder = static_cast<size_t>(src_len - input_offset);
+        memcpy(padded_block, src + input_offset, remainder);
+        size_t output_len = 0;
+        status = psa_cipher_encrypt(key_id, PSA_ALG_ECB_NO_PADDING, padded_block, sizeof(padded_block),
+                                    dest + output_offset, CIPHER_BLOCK_SIZE, &output_len);
+        if (status == PSA_SUCCESS && output_len == CIPHER_BLOCK_SIZE) {
+            output_offset += CIPHER_BLOCK_SIZE;
+        } else {
+            if (status == PSA_SUCCESS) status = PSA_ERROR_GENERIC_ERROR;
+            ESP_LOGE(TAG, "AES-ECB encryption failed: %ld", static_cast<long>(status));
+        }
+    }
+    psa_status_t destroy_status = psa_destroy_key(key_id);
+    if (destroy_status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "AES key cleanup failed: %ld", static_cast<long>(destroy_status));
+        return 0;
+    }
+    return status == PSA_SUCCESS ? output_offset : 0;
 };
 
 int McCompact::encryptThenMAC(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
+    if (src_len < 0 || shared_secret == nullptr || dest == nullptr || (src_len > 0 && src == nullptr)) {
+        ESP_LOGE(TAG, "Invalid AES/HMAC input");
+        return 0;
+    }
     int enc_len = encrypt(shared_secret, dest + CIPHER_MAC_SIZE, src, src_len);
-    const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-    // This single function performs the reset, update, and finalize steps.
-    int ret = mbedtls_md_hmac(
-        md_info,                 // Use SHA256
-        shared_secret,           // The key for the HMAC
-        PUB_KEY_SIZE,            // The length of the key
-        dest + CIPHER_MAC_SIZE,  // The message to authenticate
-        enc_len,                 // The length of the message
-        dest                     // The destination for the 32-byte MAC output
-    );
-    return ret;
+    if (src_len > 0 && enc_len == 0) return 0;
+
+    uint8_t temp_mac[32];
+    if (!computeHmacSha256(shared_secret, dest + CIPHER_MAC_SIZE, static_cast<size_t>(enc_len), temp_mac)) return 0;
+    memcpy(dest, temp_mac, CIPHER_MAC_SIZE);
+    return enc_len + CIPHER_MAC_SIZE;  // Total length of MAC + ciphertext
 };
 int McCompact::MACThenDecrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
-    if (src_len <= CIPHER_MAC_SIZE) {
+    if (src_len <= CIPHER_MAC_SIZE || shared_secret == nullptr || dest == nullptr || src == nullptr) {
+        ESP_LOGE(TAG, "Invalid HMAC/AES input");
         return 0;  // Invalid source length
     }
     uint8_t calculated_mac[32];  // Buffer to hold the calculated MAC
     const uint8_t* received_mac = src;
     const uint8_t* ciphertext = src + CIPHER_MAC_SIZE;
     const int ciphertext_len = src_len - CIPHER_MAC_SIZE;
-    // 2. Calculate the HMAC of the ciphertext portion.
-    const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-    if (md_info == NULL) {
-        return 0;  // Internal error
-    }
-    int ret = mbedtls_md_hmac(
-        md_info,         // Use SHA256
-        shared_secret,   // The HMAC key
-        16,              // Key length //todo maybe different for other things. needs to check!!
-        ciphertext,      // The data to authenticate
-        ciphertext_len,  // Length of the data
-        calculated_mac   // Output buffer for the calculated MAC
-    );
-
-    if (ret != 0) {
-        return 0;  // HMAC calculation failed
-    }
-    // 3. 🛡️ Securely compare the received MAC with the calculated MAC.
+    if (!computeHmacSha256(shared_secret, ciphertext, static_cast<size_t>(ciphertext_len), calculated_mac)) return 0;
     if (secure_memcmp(received_mac, calculated_mac, CIPHER_MAC_SIZE) == 0) {
         // 4. If MAC is valid, decrypt the ciphertext.
         return decrypt(shared_secret, dest, ciphertext, ciphertext_len);
@@ -687,19 +746,70 @@ int McCompact::secure_memcmp(const void* a, const void* b, size_t size) {
     return result;
 }
 
-void McCompact::sendNodeInfo(const MCC_MyNodeInfo& info) {
-    McPacket_t packet;
-    // packet.length = info.
-    // todo
-}
-void McCompact::sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& msg) {
-}
-
-void McCompact::sendNeighborDiscoveryRequest(uint8_t filter, std::vector<uint32_t> path) {
+void McCompact::sendNodeInfo(MCC_MyNodeInfo& info, bool flood, MCC_Path& path) {
     McPacket_t packet;
     MCC_Header header;
+    size_t pos = header.generate_header(&packet, flood ? (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_FLOOD : (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_DIRECT, (uint8_t)MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_ADVERT, path, 0);
+    size_t pos2 = info.generate_payload(packet);
+    // sign it
+    uint8_t message[PUB_KEY_SIZE + 4 + 32 + 32];
+    int msg_len = 0;
+    memcpy(&message[0], (const void*)&packet.payload[pos], PUB_KEY_SIZE + 4);
+    memcpy(&message[PUB_KEY_SIZE + 4], (const void*)&packet.payload[pos + PUB_KEY_SIZE + 4 + 64], pos2 - (PUB_KEY_SIZE + 4 + 64));
+    msg_len = pos2 - pos - 64;  // Exclude the signature part
+    uint8_t* signature = &packet.payload[pos + PUB_KEY_SIZE + 4];
+    info.sign(signature, message, msg_len);
+    // try to send it
+    if (out_queue.push(packet)) {
+        if (debugmode) ESP_LOGI(TAG, "Nodeinfo  sent");
+    } else {
+        if (debugmode) ESP_LOGE(TAG, "Failed to send nodeinfo, queue full");
+    }
+}
+void McCompact::sendGroupMsg(const MCC_ChannelEntry& channel, const std::string& sender, const std::string& msg, MCC_Path& path) {
+    McPacket_t packet;
+    MCC_Header header;
+    size_t pos = header.generate_header(&packet, (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_FLOOD, (uint8_t)MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_GRP_TXT, path, 0);
+    uint32_t timestamp = (uint32_t)time(NULL);
+    packet.payload[pos++] = channel.hash[0];
+    std::string text_part = sender + ": " + msg;
+
+    std::vector<uint8_t> message;
+
+    // Opcionális, de jó gyakorlat teljesítményszempontból: előre lefoglaljuk a memóriát
+    message.reserve(4 + 1 + text_part.length());
+
+    // 4 bájt timestamp betöltése (Little Endian sorrendben)
+    message.push_back(timestamp & 0xFF);
+    message.push_back((timestamp >> 8) & 0xFF);
+    message.push_back((timestamp >> 16) & 0xFF);
+    message.push_back((timestamp >> 24) & 0xFF);
+
+    // Flag betöltése (bit0-1: attempts, bit2: signed/unsigned)
+    message.push_back(0x00);
+    // A szöveges üzenet bájtonkénti hozzáfűzése a vektor végéhez
+    message.insert(message.end(), text_part.begin(), text_part.end());
+    // Titkosítás hívása
+    int enlen = McCompact::encryptThenMAC(
+        channel.secret,
+        &packet.payload[pos],
+        message.data(),
+        message.size());
+    pos += enlen;
+    packet.length = pos;
+    if (out_queue.push(packet)) {
+        if (debugmode) ESP_LOGI(TAG, "Group message sent");
+    } else {
+        if (debugmode) ESP_LOGE(TAG, "Failed to send group message, queue full");
+    }
+}
+
+void McCompact::sendNeighborDiscoveryRequest(uint8_t filter) {
+    McPacket_t packet;
+    MCC_Header header;
+    MCC_Path path;  // Empty path for direct routing
     // size_t generate_header(McPacket_t* packet, uint8_t route_type,  uint8_t payload_type, std::vector<uint32_t> path, uint8_t path_bytenum = 1, uint32_t transport_code = 0) {
-    header.generate_header(&packet, (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_DIRECT, (uint8_t)MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_CONTROL, path, 1, 0);
+    header.generate_header(&packet, (uint8_t)MCC_ROUTE_TYPE::ROUTE_TYPE_DIRECT, (uint8_t)MCC_PAYLOAD_TYPE::PAYLOAD_TYPE_CONTROL, path, 0);
     uint32_t tag = (uint32_t)random();
     packet.payload[packet.length++] = 0x80;  // control packet type: request for node data
     packet.payload[packet.length++] = filter;
