@@ -1,6 +1,7 @@
 
 #include "MtCompact.hpp"
 #include "esp_log.h"
+#include "psa/crypto.h"
 #include "pb.h"
 #include "pb_decode.h"
 #include "pb_encode.h"
@@ -33,13 +34,23 @@
 volatile bool packetFlag = false;
 volatile bool packet_during_send = false;
 
+namespace {
+bool initializePsaCrypto() {
+    psa_status_t status = psa_crypto_init();
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE("MtCompact", "PSA crypto initialization failed: %ld", static_cast<long>(status));
+        return false;
+    }
+    return true;
+}
+}
+
 static_assert(CONFIG_ESP_MAIN_TASK_STACK_SIZE >= 8000, "Main task stack size must be at least 8000 bytes!");
 
 void IRAM_ATTR onPacketReceived() {
     packetFlag = true && !packet_during_send;  // Only set the flag if not currently sending
 }
 MtCompact::MtCompact() {
-    mbedtls_aes_init(&aes_ctx);
     uint64_t mac;
     esp_efuse_mac_get_default((uint8_t*)&mac);  // Use the last 4 bytes of the MAC address as the node ID
     my_nodeinfo.node_id = (uint32_t)(mac & 0xFFFFFFFF);
@@ -60,7 +71,6 @@ MtCompact::MtCompact() {
 }
 
 MtCompact::~MtCompact() {
-    mbedtls_aes_free(&aes_ctx);
     need_run = false;  // Stop the tasks
     packetFlag = true;
     out_queue.stop_wait();                 // Notify any waiting pop() to unblock immediately
@@ -988,26 +998,42 @@ void MtCompact::setMyNames(const char* short_name, const char* long_name) {
 #pragma region Decoder Helpers
 
 bool MtCompact::aes_decrypt_meshtastic_payload(const uint8_t* key, uint16_t keySize, uint32_t packet_id, uint32_t from_node, const uint8_t* encrypted_in, uint8_t* decrypted_out, size_t len) {
-    int ret = mbedtls_aes_setkey_enc(&aes_ctx, key, keySize);
-    if (ret != 0) {
-        if (debugmode) {
-            ESP_LOGE(TAG, "mbedtls_aes_setkey_enc failed with error: -0x%04x", -ret);
-        }
-        // mbedtls_aes_free(&aes_ctx);
+    if (key == nullptr || keySize % 8 != 0 ||
+        (keySize != 128 && keySize != 192 && keySize != 256) ||
+        (len > 0 && (encrypted_in == nullptr || decrypted_out == nullptr))) {
+        if (debugmode) ESP_LOGE(TAG, "Invalid AES-CTR input");
         return false;
     }
+    if (!initializePsaCrypto()) return false;
+
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+    psa_set_key_bits(&attributes, keySize);
+    psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_DECRYPT);
+    psa_set_key_algorithm(&attributes, PSA_ALG_CTR);
+    psa_key_id_t key_id;
+    psa_status_t status = psa_import_key(&attributes, key, keySize / 8, &key_id);
+    psa_reset_key_attributes(&attributes);
+    if (status != PSA_SUCCESS) {
+        if (debugmode) ESP_LOGE(TAG, "AES key import failed: %ld", static_cast<long>(status));
+        return false;
+    }
+
     uint8_t nonce[16];
-    uint8_t stream_block[16];
-    size_t nc_off = 0;
     memset(nonce, 0, 16);
     memcpy(nonce, &packet_id, sizeof(uint32_t));
     memcpy(nonce + 8, &from_node, sizeof(uint32_t));
-    ret = mbedtls_aes_crypt_ctr(&aes_ctx, len, &nc_off, nonce, stream_block, encrypted_in, decrypted_out);
-    if (ret != 0) {
-        if (debugmode) {
-            ESP_LOGE(TAG, "mbedtls_aes_crypt_ctr failed with error: -0x%04x", -ret);
-        }
-        // mbedtls_aes_free(&aes_ctx);
+    size_t output_len = 0;
+    status = psa_cipher_decrypt(key_id, PSA_ALG_CTR, nonce, sizeof(nonce), encrypted_in, len,
+                                decrypted_out, len, &output_len);
+    psa_status_t destroy_status = psa_destroy_key(key_id);
+    if (status != PSA_SUCCESS || output_len != len) {
+        if (status == PSA_SUCCESS) status = PSA_ERROR_GENERIC_ERROR;
+        if (debugmode) ESP_LOGE(TAG, "AES-CTR decryption failed: %ld", static_cast<long>(status));
+        return false;
+    }
+    if (destroy_status != PSA_SUCCESS) {
+        if (debugmode) ESP_LOGE(TAG, "AES key cleanup failed: %ld", static_cast<long>(destroy_status));
         return false;
     }
     return true;

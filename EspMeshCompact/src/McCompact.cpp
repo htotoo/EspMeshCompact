@@ -1,8 +1,65 @@
 #include "McCompact.hpp"
-
 #include "esp_log.h"
+#include "psa/crypto.h"
+
 #include "esp_mac.h"
 #define TAG "McCompact"
+
+namespace {
+psa_status_t importAesKey(const uint8_t* key, size_t key_len, psa_algorithm_t algorithm, psa_key_usage_t usage, psa_key_id_t* key_id) {
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+    psa_set_key_bits(&attributes, key_len * 8);
+    psa_set_key_usage_flags(&attributes, usage);
+    psa_set_key_algorithm(&attributes, algorithm);
+    psa_status_t status = psa_import_key(&attributes, key, key_len, key_id);
+    psa_reset_key_attributes(&attributes);
+    return status;
+}
+
+bool initializePsaCrypto() {
+    psa_status_t status = psa_crypto_init();
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "PSA crypto initialization failed: %ld", static_cast<long>(status));
+        return false;
+    }
+    return true;
+}
+
+bool computeHmacSha256(const uint8_t* key, const uint8_t* message, size_t message_len, uint8_t mac[32]) {
+    if (key == nullptr || mac == nullptr || (message_len > 0 && message == nullptr) || !initializePsaCrypto()) {
+        return false;
+    }
+
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_HMAC);
+    psa_set_key_bits(&attributes, CIPHER_KEY_SIZE * 8);
+    psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_SIGN_MESSAGE);
+    psa_set_key_algorithm(&attributes, PSA_ALG_HMAC(PSA_ALG_SHA_256));
+    psa_key_id_t key_id;
+    psa_status_t status = psa_import_key(&attributes, key, CIPHER_KEY_SIZE, &key_id);
+    psa_reset_key_attributes(&attributes);
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "HMAC key import failed: %ld", static_cast<long>(status));
+        return false;
+    }
+
+    size_t mac_len = 0;
+    status = psa_mac_compute(key_id, PSA_ALG_HMAC(PSA_ALG_SHA_256), message, message_len,
+                             mac, 32, &mac_len);
+    psa_status_t destroy_status = psa_destroy_key(key_id);
+    if (status != PSA_SUCCESS || mac_len != 32) {
+        if (status == PSA_SUCCESS) status = PSA_ERROR_GENERIC_ERROR;
+        ESP_LOGE(TAG, "HMAC computation failed: %ld", static_cast<long>(status));
+        return false;
+    }
+    if (destroy_status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "HMAC key cleanup failed: %ld", static_cast<long>(destroy_status));
+        return false;
+    }
+    return true;
+}
+}
 
 volatile bool packetFlag = false;
 volatile bool packet_during_send = false;
@@ -556,120 +613,115 @@ int16_t McCompact::ProcessPacket(uint8_t* data, int len, McCompact* mshcomp) {
 }
 
 int McCompact::decrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
-    mbedtls_aes_context aes_ctx;
-    uint8_t* dp = dest;
-    const uint8_t* sp = src;
-    // Initialize the AES context
-    mbedtls_aes_init(&aes_ctx);
-    // Set the decryption key. Note the use of `_setkey_dec`
-    // IMPORTANT: CIPHER_KEY_SIZE must be in BITS (e.g., 128, 192, 256)
-    mbedtls_aes_setkey_dec(&aes_ctx, shared_secret, CIPHER_KEY_SIZE * 8);
-
-    // Process all 16-byte blocks
-    for (int i = 0; i < src_len; i += 16) {
-        mbedtls_aes_crypt_ecb(
-            &aes_ctx,             // AES context
-            MBEDTLS_AES_DECRYPT,  // Decrypt mode
-            sp,                   // Source ciphertext block
-            dp                    // Destination plaintext block
-        );
-        dp += 16;
-        sp += 16;
+    if (src_len < 0 || src_len % CIPHER_BLOCK_SIZE != 0 ||
+        (src_len > 0 && (shared_secret == nullptr || dest == nullptr || src == nullptr))) {
+        ESP_LOGE(TAG, "Invalid AES-ECB input");
+        return 0;
     }
-    // Clean up the context
-    mbedtls_aes_free(&aes_ctx);
-    // Return the total number of bytes processed
-    return sp - src;
+    if (src_len == 0) return 0;
+    if (!initializePsaCrypto()) return 0;
+
+    psa_key_id_t key_id;
+    psa_status_t status = importAesKey(shared_secret, CIPHER_KEY_SIZE, PSA_ALG_ECB_NO_PADDING,
+                                       PSA_KEY_USAGE_DECRYPT, &key_id);
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "AES key import failed: %ld", static_cast<long>(status));
+        return 0;
+    }
+
+    int processed = 0;
+    for (; processed < src_len; processed += CIPHER_BLOCK_SIZE) {
+        size_t output_len = 0;
+        status = psa_cipher_decrypt(key_id, PSA_ALG_ECB_NO_PADDING, src + processed, CIPHER_BLOCK_SIZE,
+                                    dest + processed, CIPHER_BLOCK_SIZE, &output_len);
+        if (status != PSA_SUCCESS || output_len != CIPHER_BLOCK_SIZE) {
+            if (status == PSA_SUCCESS) status = PSA_ERROR_GENERIC_ERROR;
+            ESP_LOGE(TAG, "AES-ECB decryption failed: %ld", static_cast<long>(status));
+            break;
+        }
+    }
+    psa_status_t destroy_status = psa_destroy_key(key_id);
+    if (destroy_status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "AES key cleanup failed: %ld", static_cast<long>(destroy_status));
+        return 0;
+    }
+    return processed == src_len ? processed : 0;
 };
 int McCompact::encrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
-    mbedtls_aes_context aes_ctx;
-    uint8_t* dp = dest;
-    const uint8_t* sp = src;
-    int remaining_len = src_len;
-    // Initialize the AES context
-    mbedtls_aes_init(&aes_ctx);
-    // Set the encryption key.
-    // IMPORTANT: CIPHER_KEY_SIZE must be in BITS (e.g., 128, 192, 256)
-    mbedtls_aes_setkey_enc(&aes_ctx, shared_secret, CIPHER_KEY_SIZE * 8);
-    // Process all full 16-byte blocks
-    while (remaining_len >= 16) {
-        mbedtls_aes_crypt_ecb(
-            &aes_ctx,             // AES context
-            MBEDTLS_AES_ENCRYPT,  // Encrypt mode
-            sp,                   // Source block
-            dp                    // Destination block
-        );
-        dp += 16;
-        sp += 16;
-        remaining_len -= 16;
+    if (src_len < 0 || (src_len > 0 && (shared_secret == nullptr || dest == nullptr || src == nullptr))) {
+        ESP_LOGE(TAG, "Invalid AES-ECB input");
+        return 0;
+    }
+    if (src_len == 0) return 0;
+    if (!initializePsaCrypto()) return 0;
+
+    psa_key_id_t key_id;
+    psa_status_t status = importAesKey(shared_secret, CIPHER_KEY_SIZE, PSA_ALG_ECB_NO_PADDING,
+                                       PSA_KEY_USAGE_ENCRYPT, &key_id);
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "AES key import failed: %ld", static_cast<long>(status));
+        return 0;
     }
 
-    // Handle the final partial block with zero padding
-    if (remaining_len > 0) {
-        uint8_t tmp_block[16];
-        // Pad the temporary block with zeros
-        memset(tmp_block, 0, 16);
-        // Copy the remaining plaintext into the block
-        memcpy(tmp_block, sp, remaining_len);
-        // Encrypt the padded block
-        mbedtls_aes_crypt_ecb(
-            &aes_ctx,
-            MBEDTLS_AES_ENCRYPT,
-            tmp_block,
-            dp);
-        dp += 16;
+    int input_offset = 0;
+    int output_offset = 0;
+    while (src_len - input_offset >= CIPHER_BLOCK_SIZE) {
+        size_t output_len = 0;
+        status = psa_cipher_encrypt(key_id, PSA_ALG_ECB_NO_PADDING, src + input_offset, CIPHER_BLOCK_SIZE,
+                                    dest + output_offset, CIPHER_BLOCK_SIZE, &output_len);
+        if (status != PSA_SUCCESS || output_len != CIPHER_BLOCK_SIZE) {
+            if (status == PSA_SUCCESS) status = PSA_ERROR_GENERIC_ERROR;
+            ESP_LOGE(TAG, "AES-ECB encryption failed: %ld", static_cast<long>(status));
+            break;
+        }
+        input_offset += CIPHER_BLOCK_SIZE;
+        output_offset += CIPHER_BLOCK_SIZE;
     }
-    // Clean up the context
-    mbedtls_aes_free(&aes_ctx);
-    // Return the total number of bytes written to the destination
-    return dp - dest;
+    if (status == PSA_SUCCESS && input_offset < src_len) {
+        uint8_t padded_block[CIPHER_BLOCK_SIZE] = {};
+        const size_t remainder = static_cast<size_t>(src_len - input_offset);
+        memcpy(padded_block, src + input_offset, remainder);
+        size_t output_len = 0;
+        status = psa_cipher_encrypt(key_id, PSA_ALG_ECB_NO_PADDING, padded_block, sizeof(padded_block),
+                                    dest + output_offset, CIPHER_BLOCK_SIZE, &output_len);
+        if (status == PSA_SUCCESS && output_len == CIPHER_BLOCK_SIZE) {
+            output_offset += CIPHER_BLOCK_SIZE;
+        } else {
+            if (status == PSA_SUCCESS) status = PSA_ERROR_GENERIC_ERROR;
+            ESP_LOGE(TAG, "AES-ECB encryption failed: %ld", static_cast<long>(status));
+        }
+    }
+    psa_status_t destroy_status = psa_destroy_key(key_id);
+    if (destroy_status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "AES key cleanup failed: %ld", static_cast<long>(destroy_status));
+        return 0;
+    }
+    return status == PSA_SUCCESS ? output_offset : 0;
 };
 
 int McCompact::encryptThenMAC(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
-    int enc_len = encrypt(shared_secret, dest + CIPHER_MAC_SIZE, src, src_len);
-    const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-    // This single function performs the reset, update, and finalize steps.
-    uint8_t temp_mac[32];
-    int ret = mbedtls_md_hmac(
-        md_info,                 // Use SHA256
-        shared_secret,           // The key for the HMAC
-        16,                      // The length of the key
-        dest + CIPHER_MAC_SIZE,  // The message to authenticate
-        enc_len,                 // The length of the message
-        temp_mac                 // The destination for the 32-byte MAC output
-    );
-    if (ret != 0) {
-        return 0;  // HMAC calculation failed
+    if (src_len < 0 || shared_secret == nullptr || dest == nullptr || (src_len > 0 && src == nullptr)) {
+        ESP_LOGE(TAG, "Invalid AES/HMAC input");
+        return 0;
     }
+    int enc_len = encrypt(shared_secret, dest + CIPHER_MAC_SIZE, src, src_len);
+    if (src_len > 0 && enc_len == 0) return 0;
+
+    uint8_t temp_mac[32];
+    if (!computeHmacSha256(shared_secret, dest + CIPHER_MAC_SIZE, static_cast<size_t>(enc_len), temp_mac)) return 0;
     memcpy(dest, temp_mac, CIPHER_MAC_SIZE);
     return enc_len + CIPHER_MAC_SIZE;  // Total length of MAC + ciphertext
 };
 int McCompact::MACThenDecrypt(const uint8_t* shared_secret, uint8_t* dest, const uint8_t* src, int src_len) {
-    if (src_len <= CIPHER_MAC_SIZE) {
+    if (src_len <= CIPHER_MAC_SIZE || shared_secret == nullptr || dest == nullptr || src == nullptr) {
+        ESP_LOGE(TAG, "Invalid HMAC/AES input");
         return 0;  // Invalid source length
     }
     uint8_t calculated_mac[32];  // Buffer to hold the calculated MAC
     const uint8_t* received_mac = src;
     const uint8_t* ciphertext = src + CIPHER_MAC_SIZE;
     const int ciphertext_len = src_len - CIPHER_MAC_SIZE;
-    // 2. Calculate the HMAC of the ciphertext portion.
-    const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-    if (md_info == NULL) {
-        return 0;  // Internal error
-    }
-    int ret = mbedtls_md_hmac(
-        md_info,         // Use SHA256
-        shared_secret,   // The HMAC key
-        16,              // Key length //todo maybe different for other things. needs to check!!
-        ciphertext,      // The data to authenticate
-        ciphertext_len,  // Length of the data
-        calculated_mac   // Output buffer for the calculated MAC
-    );
-
-    if (ret != 0) {
-        return 0;  // HMAC calculation failed
-    }
-    // 3. 🛡️ Securely compare the received MAC with the calculated MAC.
+    if (!computeHmacSha256(shared_secret, ciphertext, static_cast<size_t>(ciphertext_len), calculated_mac)) return 0;
     if (secure_memcmp(received_mac, calculated_mac, CIPHER_MAC_SIZE) == 0) {
         // 4. If MAC is valid, decrypt the ciphertext.
         return decrypt(shared_secret, dest, ciphertext, ciphertext_len);
