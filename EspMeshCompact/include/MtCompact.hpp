@@ -7,7 +7,6 @@
 #include <string.h>
 #include "pb.h"
 #include "RadioLib.h"
-#include "EspHal.h"
 #include "esp_random.h"
 #include <string>
 #include "meshtastic/mesh.pb.h"

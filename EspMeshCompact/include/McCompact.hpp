@@ -6,7 +6,6 @@
 #include <string.h>
 #include "RadioStructs.hpp"
 #include "RadioLib.h"
-#include "EspHal.h"
 #include "esp_random.h"
 #include <string>
 #include <mutex>
